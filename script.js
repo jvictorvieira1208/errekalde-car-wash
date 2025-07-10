@@ -619,16 +619,6 @@ function updateSelectedServicesSummary() {
     if (reservationData.services.length === 0) {
         selectedServicesList.textContent = 'Ningún servicio seleccionado';
     } else {
-        // Crear un mapa de precios directo para evitar cualquier problema con DOM
-        const servicePrices = {
-            'interior': reservationData.carSize === 'small' ? 23 : reservationData.carSize === 'medium' ? 25 : 28,
-            'exterior': reservationData.carSize === 'small' ? 20 : reservationData.carSize === 'medium' ? 22 : 25,
-            'complete': reservationData.carSize === 'small' ? 40 : reservationData.carSize === 'medium' ? 45 : 50,
-            'complete-fabric': reservationData.carSize === 'small' ? 85 : reservationData.carSize === 'medium' ? 95 : 105,
-            'headlight-1': 35,
-            'headlight-2': 60
-        };
-        
         selectedServicesList.innerHTML = reservationData.services.map(serviceType => {
             // Nombres completamente fijos - IMPOSIBLE duplicación
             const serviceNames = {
@@ -641,9 +631,12 @@ function updateSelectedServicesSummary() {
             };
             
             const cleanName = serviceNames[serviceType] || serviceType;
-            const price = servicePrices[serviceType] || 0;
             
-            return `<div class="selected-service-item">• ${cleanName} ${price}€</div>`;
+            // OBTENER EL PRECIO REAL del elemento seleccionado en el DOM
+            const serviceElement = document.querySelector(`[data-service="${serviceType}"]`);
+            const realPrice = serviceElement ? parseInt(serviceElement.dataset.price) : 0;
+            
+            return `<div class="selected-service-item">• ${cleanName} ${realPrice}€</div>`;
         }).join('');
     }
     
