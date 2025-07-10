@@ -57,6 +57,8 @@ let availableSpaces = 8;
 let verificationCode = '';
 let isVerified = false;
 let espaciosGlobales = {}; // Para sincronización global
+let lastSyncTime = null; // Tiempo de última sincronización
+let syncStatus = 'conectado'; // Estado de sincronización: 'conectado', 'desconectado', 'sincronizando'
 let reservationData = {
     date: null,
     name: '',
@@ -126,16 +128,18 @@ function setupEventListeners() {
     document.getElementById('car-brand').addEventListener('input', detectVehicleSize);
     document.getElementById('car-model').addEventListener('input', detectVehicleSize);
     
-    // Botón de test webhook N8N
-    document.getElementById('testWebhookBtn').addEventListener('click', async () => {
-        showNotification('🧪 Probando webhook N8N...', 'info');
-        const resultado = await verificarEstadoWebhook();
-        
-        if (resultado.success) {
-            showNotification('✅ Webhook N8N funcionando correctamente', 'success');
-        } else {
-            showNotification(`❌ Error en webhook N8N: ${resultado.error || 'Error desconocido'}`, 'error');
-        }
+    // ELIMINAR MENSAJES AZULES al hacer clic en cualquier lugar - VERSIÓN CONSERVADORA
+    document.addEventListener('click', () => {
+        setTimeout(() => {
+            // Solo buscar elementos específicos que contengan el texto prohibido
+            document.querySelectorAll('p, div').forEach(element => {
+                const text = element.textContent || '';
+                if (text.includes('💡 Selecciona UN tipo de limpieza + OPCIONALMENTE UN pulido de faro')) {
+                    console.log('🗑️ ELIMINANDO mensaje azul específico:', element);
+                    element.remove();
+                }
+            });
+        }, 10);
     });
 }
 
@@ -327,8 +331,6 @@ async function selectDate(date, dayElement) {
     
     // Actualizar navegación
     updateNavigation();
-    
-    showNotification(`Fecha seleccionada: ${availableSpaces}/8 espacios disponibles`, 'success');
 }
 
 // Sistema de verificación
@@ -350,13 +352,10 @@ async function handleSendCode() {
     reservationData.phone = phone;
     
     try {
-        showNotification('Enviando código de verificación...', 'warning');
-        
         verificationCode = generateVerificationCode();
         await sendVerificationCode(phone, verificationCode);
         
         document.getElementById('verification-section').classList.remove('hidden');
-        showNotification('Código enviado por WhatsApp', 'success');
         
     } catch (error) {
         console.error('Error enviando código:', error);
@@ -392,7 +391,6 @@ async function handleResendCode() {
     try {
         verificationCode = generateVerificationCode();
         await sendVerificationCode(reservationData.phone, verificationCode);
-        showNotification('Nuevo código enviado', 'success');
     } catch (error) {
         showNotification('Error al reenviar el código', 'error');
     }
@@ -462,7 +460,6 @@ function loadPricingSection() {
     
     pricingSection.innerHTML = `
         <h3>Precios para vehículos ${sizeName.toLowerCase()}s</h3>
-        <p class="service-instructions">💡 Selecciona UN tipo de limpieza + OPCIONALMENTE UN pulido de faro. Solo puedes elegir un faro a la vez.</p>
         <div class="pricing-grid">
             <div class="pricing-card">
                 <h3><i class="fas fa-car"></i> Servicios de Limpieza</h3>
@@ -507,6 +504,18 @@ function loadPricingSection() {
         </div>
     `;
     
+    // Limpieza conservadora de mensajes azules específicos
+    setTimeout(() => {
+        // Solo buscar el mensaje específico problemático
+        document.querySelectorAll('p, div').forEach(element => {
+            const text = element.textContent || '';
+            if (text.includes('💡 Selecciona UN tipo de limpieza + OPCIONALMENTE UN pulido de faro')) {
+                console.log('🗑️ ELIMINANDO mensaje azul específico en pricing:', element);
+                element.remove();
+            }
+        });
+    }, 100);
+    
     // Agregar event listeners para selección de servicios
     pricingSection.querySelectorAll('li').forEach(li => {
         li.addEventListener('click', () => selectService(li));
@@ -530,7 +539,19 @@ function loadPricingSection() {
 
 function selectService(serviceElement) {
     const serviceType = serviceElement.dataset.service;
-    const serviceName = serviceElement.textContent.split('€')[0].trim();
+    
+    // Definir nombres limpios manualmente
+    let serviceName = '';
+    switch(serviceType) {
+        case 'interior': serviceName = 'Limpieza interior'; break;
+        case 'exterior': serviceName = 'Limpieza exterior'; break;
+        case 'complete': serviceName = 'Limpieza completa'; break;
+        case 'complete-fabric': serviceName = 'Limpieza completa con tapicería'; break;
+        case 'headlight-1': serviceName = 'Un faro'; break;
+        case 'headlight-2': serviceName = 'Dos faros'; break;
+        default: serviceName = serviceElement.innerHTML.split('<strong>')[0].trim();
+    }
+    
     const price = parseInt(serviceElement.dataset.price);
     
     // Verificar si es un servicio de limpieza (solo uno permitido)
@@ -555,17 +576,22 @@ function selectService(serviceElement) {
         const isHeadlightService = ['headlight-1', 'headlight-2'].includes(serviceType);
         
         if (isHeadlightService) {
-            // Deseleccionar otros servicios de faros
-            document.querySelectorAll('.pricing-card li[data-service="headlight-1"], .pricing-card li[data-service="headlight-2"]').forEach(li => {
-                li.classList.remove('selected');
-            });
-            
-            // Remover servicios de faros anteriores del array
-            reservationData.services = reservationData.services.filter(s => !['headlight-1', 'headlight-2'].includes(s));
-            reservationData.serviceNames = reservationData.serviceNames.filter(name => !name.includes('faro'));
-            
-            // Si el elemento clicado no estaba seleccionado, seleccionarlo
-            if (!serviceElement.classList.contains('selected')) {
+            // Si el elemento ya está seleccionado, deseleccionarlo
+            if (serviceElement.classList.contains('selected')) {
+                serviceElement.classList.remove('selected');
+                reservationData.services = reservationData.services.filter(s => s !== serviceType);
+                reservationData.serviceNames = reservationData.serviceNames.filter(name => !name.includes('faro'));
+            } else {
+                // Deseleccionar otros servicios de faros
+                document.querySelectorAll('.pricing-card li[data-service="headlight-1"], .pricing-card li[data-service="headlight-2"]').forEach(li => {
+                    li.classList.remove('selected');
+                });
+                
+                // Remover servicios de faros anteriores del array
+                reservationData.services = reservationData.services.filter(s => !['headlight-1', 'headlight-2'].includes(s));
+                reservationData.serviceNames = reservationData.serviceNames.filter(name => !name.includes('faro'));
+                
+                // Seleccionar el nuevo servicio de faro
                 serviceElement.classList.add('selected');
                 reservationData.services.push(serviceType);
                 reservationData.serviceNames.push(serviceName);
@@ -584,20 +610,41 @@ function selectService(serviceElement) {
     
     // Habilitar botón de continuar si hay al menos un servicio seleccionado
     document.getElementById('nextToPage5').disabled = reservationData.services.length === 0;
-    
-    showNotification('Servicios actualizados', 'success');
 }
 
 function updateSelectedServicesSummary() {
     const selectedServicesList = document.getElementById('selectedServicesList');
     const totalPriceElement = document.getElementById('totalPrice');
     
-    if (reservationData.serviceNames.length === 0) {
+    if (reservationData.services.length === 0) {
         selectedServicesList.textContent = 'Ningún servicio seleccionado';
     } else {
-        selectedServicesList.innerHTML = reservationData.serviceNames.map(name => 
-            `<div class="selected-service-item">• ${name}</div>`
-        ).join('');
+        // Crear un mapa de precios directo para evitar cualquier problema con DOM
+        const servicePrices = {
+            'interior': reservationData.carSize === 'small' ? 23 : reservationData.carSize === 'medium' ? 25 : 28,
+            'exterior': reservationData.carSize === 'small' ? 20 : reservationData.carSize === 'medium' ? 22 : 25,
+            'complete': reservationData.carSize === 'small' ? 40 : reservationData.carSize === 'medium' ? 45 : 50,
+            'complete-fabric': reservationData.carSize === 'small' ? 85 : reservationData.carSize === 'medium' ? 95 : 105,
+            'headlight-1': 35,
+            'headlight-2': 60
+        };
+        
+        selectedServicesList.innerHTML = reservationData.services.map(serviceType => {
+            // Nombres completamente fijos - IMPOSIBLE duplicación
+            const serviceNames = {
+                'interior': 'Limpieza interior',
+                'exterior': 'Limpieza exterior', 
+                'complete': 'Limpieza completa',
+                'complete-fabric': 'Limpieza completa con tapicería',
+                'headlight-1': 'Un faro',
+                'headlight-2': 'Dos faros'
+            };
+            
+            const cleanName = serviceNames[serviceType] || serviceType;
+            const price = servicePrices[serviceType] || 0;
+            
+            return `<div class="selected-service-item">• ${cleanName} ${price}€</div>`;
+        }).join('');
     }
     
     totalPriceElement.textContent = `${reservationData.price}€`;
@@ -641,8 +688,31 @@ function generateReservationSummary() {
         </div>
         <div class="summary-item">
             <span class="summary-label">Servicios:</span>
-            <span class="summary-value">${reservationData.serviceNames.join(', ')}</span>
-        </div>${notasSection}
+            <span class="summary-value">${reservationData.services.filter(serviceType => 
+                !['headlight-1', 'headlight-2'].includes(serviceType)
+            ).map(serviceType => {
+                switch(serviceType) {
+                    case 'interior': return 'Limpieza interior';
+                    case 'exterior': return 'Limpieza exterior';
+                    case 'complete': return 'Limpieza completa';
+                    case 'complete-fabric': return 'Limpieza completa con tapicería';
+                    default: return serviceType;
+                }
+            }).join(', ')}</span>
+        </div>
+        ${reservationData.services.some(serviceType => ['headlight-1', 'headlight-2'].includes(serviceType)) ? `
+        <div class="summary-item">
+            <span class="summary-label">Suplementos:</span>
+            <span class="summary-value">${reservationData.services.filter(serviceType => 
+                ['headlight-1', 'headlight-2'].includes(serviceType)
+            ).map(serviceType => {
+                switch(serviceType) {
+                    case 'headlight-1': return 'Un faro';
+                    case 'headlight-2': return 'Dos faros';
+                    default: return serviceType;
+                }
+            }).join(', ')}</span>
+        </div>` : ''}${notasSection}
         <div class="summary-item">
             <span class="summary-label">Precio total:</span>
             <span class="summary-value">${reservationData.price}€</span>
@@ -653,8 +723,6 @@ function generateReservationSummary() {
 // Confirmación de reserva con sincronización global
 async function handleConfirmReservation() {
     try {
-        showNotification('Procesando reserva...', 'warning');
-        
         // Preparar datos de reserva para el servidor
         const reservaParaServidor = {
             fecha: selectedDate.toISOString().split('T')[0],
@@ -671,8 +739,6 @@ async function handleConfirmReservation() {
         // Generar resumen final
         generateFinalSummary();
         
-        showNotification(`¡Reserva confirmada! Espacios restantes: ${resultadoReserva.espaciosDisponibles}/8`, 'success');
-        
         // Enviar confirmación a n8n (no bloquea el flujo si falla)
         try {
             console.log('Intentando enviar WhatsApp...');
@@ -681,11 +747,9 @@ async function handleConfirmReservation() {
                 console.warn('Webhook falló pero reserva confirmada:', webhookResult.error);
             } else {
                 console.log('WhatsApp enviado exitosamente');
-                showNotification('WhatsApp de confirmación enviado', 'success');
             }
         } catch (webhookError) {
             console.error('Error en webhook (no crítico):', webhookError);
-            showNotification('Reserva confirmada. WhatsApp puede tardar unos momentos.', 'warning');
         }
         
     } catch (error) {
@@ -705,7 +769,27 @@ function generateFinalSummary() {
             month: 'long', 
             day: 'numeric' 
         })}</p>
-        <p><strong>Servicios:</strong> ${reservationData.serviceNames.join(', ')}</p>
+        <p><strong>Servicios:</strong> ${reservationData.services.filter(serviceType => 
+            !['headlight-1', 'headlight-2'].includes(serviceType)
+        ).map(serviceType => {
+            switch(serviceType) {
+                case 'interior': return 'Limpieza interior';
+                case 'exterior': return 'Limpieza exterior';
+                case 'complete': return 'Limpieza completa';
+                case 'complete-fabric': return 'Limpieza completa con tapicería';
+                default: return serviceType;
+            }
+        }).join(', ')}</p>
+        ${reservationData.services.some(serviceType => ['headlight-1', 'headlight-2'].includes(serviceType)) ? `
+        <p><strong>Suplementos:</strong> ${reservationData.services.filter(serviceType => 
+            ['headlight-1', 'headlight-2'].includes(serviceType)
+        ).map(serviceType => {
+            switch(serviceType) {
+                case 'headlight-1': return 'Un faro';
+                case 'headlight-2': return 'Dos faros';
+                default: return serviceType;
+            }
+        }).join(', ')}</p>` : ''}
         <p><strong>Precio:</strong> ${reservationData.price}€</p>
         <p><strong>Vehículo:</strong> ${reservationData.carBrand} ${reservationData.carModel}</p>
         <hr>
@@ -745,8 +829,6 @@ function handleNewReservation() {
     
     // Volver a la página 1
     goToPage(1);
-    
-    showNotification('Nueva reserva iniciada', 'success');
 }
 
 // Funciones auxiliares
@@ -789,8 +871,18 @@ async function sendBookingConfirmation(reservationData) {
     // Generar ID de reserva único
     const reservationId = `RESERVA-${Date.now()}`;
     
-    // Formatear servicios
-    let serviciosTexto = reservationData.serviceNames.join(' + ');
+    // Formatear solo servicios principales (sin faros/suplementos)
+    let serviciosTexto = reservationData.services.filter(serviceType => 
+        !['headlight-1', 'headlight-2'].includes(serviceType)
+    ).map(serviceType => {
+        switch(serviceType) {
+            case 'interior': return 'Limpieza interior';
+            case 'exterior': return 'Limpieza exterior';
+            case 'complete': return 'Limpieza completa';
+            case 'complete-fabric': return 'Limpieza completa con tapicería';
+            default: return serviceType;
+        }
+    }).join(' + ');
     
     // Detectar suplementos
     let suplementos = "Ninguno";
@@ -887,77 +979,7 @@ _Servicio exclusivo para empleados SWAP ENERGIA_ ✨`;
     return responseData;
 }
 
-// Función para verificar el estado del webhook N8N
-async function verificarEstadoWebhook() {
-    try {
-        console.log('🔍 Verificando estado del webhook N8N...');
-        
-        const testPayload = {
-            phone: '+34600123456',
-            message: '🧪 TEST WEBHOOK - ' + new Date().toLocaleString(),
-            type: 'test',
-            reservationId: 'TEST-' + Date.now(),
-            timestamp: new Date().toISOString(),
-            reservationData: {
-                name: 'Test Usuario',
-                phone: '+34600123456',
-                date: 'Test Date',
-                vehicle: 'Test Vehicle',
-                services: 'Test Service',
-                supplements: 'Ninguno',
-                price: 0,
-                vehicleSize: 'test'
-            }
-        };
-        
-        console.log('📤 Enviando test payload:', testPayload);
-        
-        const response = await fetch(`${SERVER_URL}/api/send-webhook`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(testPayload)
-        });
-        
-        console.log('📥 Respuesta HTTP:', response.status, response.statusText);
-        
-        const responseData = await response.json();
-        console.log('📊 Estado del webhook:', {
-            status: response.status,
-            statusText: response.statusText,
-            response: responseData
-        });
-        
-        // Análisis del resultado
-        if (response.ok && responseData.debug) {
-            console.log('🔍 DEBUG INFO:');
-            console.log('   📞 Teléfono enviado:', responseData.debug.phone);
-            console.log('   📝 Tipo:', responseData.debug.type);
-            console.log('   ⚡ Status N8N:', responseData.debug.n8nStatus);
-            
-            if (responseData.debug.n8nStatus === 200) {
-                console.log('   ✅ N8N recibe el webhook correctamente');
-                console.log('   ❓ POSIBLE PROBLEMA: Configuración de WhatsApp en N8N');
-                showNotification('✅ N8N recibe datos OK. Revisar config WhatsApp en N8N', 'warning');
-            }
-        }
-        
-        return {
-            success: response.ok,
-            status: response.status,
-            data: responseData,
-            n8nReceived: response.ok && responseData.debug?.n8nStatus === 200
-        };
-        
-    } catch (error) {
-        console.error('❌ Error verificando webhook:', error);
-        return {
-            success: false,
-            error: error.message
-        };
-    }
-}
+
 
 
 // Sistema de notificaciones
@@ -993,33 +1015,84 @@ function getNotificationIcon(type) {
     return icons[type] || 'fa-info-circle';
 }
 
-// ===== SISTEMA DE SINCRONIZACIÓN GLOBAL =====
+// ===== SISTEMA DE SINCRONIZACIÓN GLOBAL MEJORADO =====
 
-// Función para sincronizar espacios disponibles
+// Función para sincronizar espacios disponibles con indicadores visuales
 async function sincronizarEspaciosGlobal() {
     try {
+        // Actualizar estado a sincronizando
+        updateSyncStatus('sincronizando');
+        
         const response = await fetch(`${SERVER_URL}/api/sync-espacios`);
         if (response.ok) {
             const data = await response.json();
+            const espaciosAnteriores = { ...espaciosGlobales };
             espaciosGlobales = data.espacios;
+            lastSyncTime = new Date();
+            
+            // Detectar cambios y notificar
+            detectarCambiosEspacios(espaciosAnteriores, espaciosGlobales);
             
             // Actualizar espacios en el calendario si hay una fecha seleccionada
             if (selectedDate) {
                 const fechaStr = selectedDate.toISOString().split('T')[0];
                 const espaciosDisponibles = espaciosGlobales[fechaStr] || 8;
+                const espaciosAnteriores = availableSpaces;
                 availableSpaces = espaciosDisponibles;
-                availableSpacesElement.textContent = espaciosDisponibles;
+                
+                if (availableSpacesElement) {
+                    availableSpacesElement.textContent = espaciosDisponibles;
+                    
+                    // Animar si hay cambios
+                    if (espaciosAnteriores !== espaciosDisponibles) {
+                        availableSpacesElement.style.animation = 'none';
+                        void availableSpacesElement.offsetWidth;
+                        availableSpacesElement.style.animation = 'pulse 0.5s ease-in-out';
+                    }
+                }
             }
             
             // Actualizar visualización del calendario
             actualizarCalendarioConEspacios();
+            
+            // Estado exitoso
+            updateSyncStatus('conectado');
+            
+        } else {
+            throw new Error(`Error HTTP: ${response.status}`);
         }
     } catch (error) {
         console.error('Error en sincronización:', error);
+        updateSyncStatus('desconectado');
+        
+        // Reintentar después de 10 segundos si hay error
+        setTimeout(() => {
+            console.log('🔄 Reintentando sincronización...');
+            sincronizarEspaciosGlobal();
+        }, 10000);
     }
 }
 
-// Función para actualizar el calendario con espacios disponibles
+// Función para detectar cambios en espacios (sin notificaciones)
+function detectarCambiosEspacios(espaciosAnteriores, espaciosNuevos) {
+    // Solo detectar cambios internamente, sin mostrar notificaciones
+    for (const fecha in espaciosNuevos) {
+        const espaciosAntes = espaciosAnteriores[fecha];
+        const espaciosAhora = espaciosNuevos[fecha];
+        
+        if (espaciosAntes !== undefined && espaciosAntes !== espaciosAhora) {
+            console.log(`Cambio detectado en ${fecha}: ${espaciosAntes} → ${espaciosAhora}`);
+        }
+    }
+}
+
+// Función para actualizar estado de sincronización (sin indicadores visuales)
+function updateSyncStatus(status) {
+    syncStatus = status;
+    // Solo mantener el estado interno, sin mostrar indicadores visuales
+}
+
+// Función para actualizar el calendario con espacios disponibles y animaciones
 function actualizarCalendarioConEspacios() {
     const dayElements = document.querySelectorAll('.ios-calendar-day.available');
     
@@ -1030,12 +1103,23 @@ function actualizarCalendarioConEspacios() {
             const currentDate = new Date(currentYear, currentMonth, dayNumber);
             const fechaStr = currentDate.toISOString().split('T')[0];
             const espaciosDisponibles = espaciosGlobales[fechaStr] || 8;
+            const espaciosAnteriores = dayElement.dataset.espacios;
             
             // Actualizar el texto del día con espacios disponibles
             dayElement.innerHTML = `
                 <span class="day-number">${dayNumber}</span>
                 <span class="spaces-available">${espaciosDisponibles}/8</span>
             `;
+            
+            // Animar si hay cambios
+            if (espaciosAnteriores && parseInt(espaciosAnteriores) !== espaciosDisponibles) {
+                dayElement.style.animation = 'none';
+                void dayElement.offsetWidth;
+                dayElement.style.animation = 'bounce 0.6s ease-in-out';
+            }
+            
+            // Guardar espacios para detectar cambios futuros
+            dayElement.dataset.espacios = espaciosDisponibles;
             
             // Cambiar estilo si no hay espacios disponibles
             if (espaciosDisponibles <= 0) {
@@ -1049,6 +1133,41 @@ function actualizarCalendarioConEspacios() {
             }
         }
     });
+}
+
+// Función mejorada para hacer una reserva en el servidor
+async function hacerReservaEnServidor(reservaData) {
+    try {
+        // Sincronización rápida antes de reservar
+        updateSyncStatus('sincronizando');
+        
+        const response = await fetch(`${SERVER_URL}/api/reservar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(reservaData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            // Sincronización inmediata después de reserva exitosa
+            await sincronizarEspaciosGlobal();
+            
+            // Sincronización adicional después de 2 segundos para asegurar propagación
+            setTimeout(sincronizarEspaciosGlobal, 2000);
+            
+            console.log('✅ Reserva confirmada y sincronizada globalmente');
+            return result;
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al hacer la reserva');
+        }
+    } catch (error) {
+        updateSyncStatus('desconectado');
+        throw error;
+    }
 }
 
 // Función para obtener espacios disponibles para una fecha específica
@@ -1066,38 +1185,35 @@ async function obtenerEspaciosDisponibles(fecha) {
     return 8; // Valor por defecto
 }
 
-// Función para hacer una reserva en el servidor
-async function hacerReservaEnServidor(reservaData) {
-    try {
-        const response = await fetch(`${SERVER_URL}/api/reservar`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(reservaData)
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            // Actualizar espacios globales
-            await sincronizarEspaciosGlobal();
-            return result;
-        } else {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al hacer la reserva');
-        }
-    } catch (error) {
-        throw error;
-    }
-}
-
-// Inicializar sincronización automática
+// Inicializar sincronización automática mejorada
 function inicializarSincronizacion() {
+    console.log('🔄 Iniciando sistema de sincronización global mejorado...');
+    
     // Sincronizar al cargar la página
     sincronizarEspaciosGlobal();
     
-    // Sincronizar cada 5 segundos
+    // Sincronización regular cada 5 segundos
     setInterval(sincronizarEspaciosGlobal, 5000);
+    
+    // Sincronización cuando la página vuelve a tener foco
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            console.log('🔄 Página activa - Sincronización inmediata');
+            sincronizarEspaciosGlobal();
+        }
+    });
+    
+    // Sincronización cuando se restaura la conexión
+    window.addEventListener('online', function() {
+        console.log('🌐 Conexión restaurada - Sincronización inmediata');
+        sincronizarEspaciosGlobal();
+    });
+    
+    // Detectar pérdida de conexión
+    window.addEventListener('offline', function() {
+        console.log('❌ Conexión perdida');
+        updateSyncStatus('desconectado');
+    });
 }
 
 // Inicializar espacios en el servidor
@@ -1113,6 +1229,32 @@ async function inicializarEspaciosEnServidor() {
         console.error('Error inicializando espacios:', error);
     }
 }
+
+// LIMPIEZA CONSERVADORA de mensajes azules específicos
+document.addEventListener('DOMContentLoaded', function() {
+    const cleanUpBlueMessages = () => {
+        console.log('🧹 Limpieza conservadora de mensajes azules...');
+        
+        // Buscar solo el mensaje específico problemático
+        document.querySelectorAll('p, div, span').forEach(element => {
+            const text = element.textContent || '';
+            
+            // Solo eliminar el mensaje exacto que causa problemas
+            if (text.includes('💡 Selecciona UN tipo de limpieza + OPCIONALMENTE UN pulido de faro') ||
+                text.includes('Solo puedes elegir un faro a la vez')) {
+                console.log('🗑️ ELIMINANDO mensaje azul específico:', element);
+                element.remove();
+            }
+        });
+    };
+    
+    // Ejecutar limpieza básica
+    setTimeout(cleanUpBlueMessages, 100);
+    setTimeout(cleanUpBlueMessages, 500);
+    setTimeout(cleanUpBlueMessages, 1000);
+    
+    console.log('✅ Sistema de limpieza conservadora activado');
+});
 
 // Exportar funciones para testing
 if (typeof module !== 'undefined' && module.exports) {

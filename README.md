@@ -11,12 +11,17 @@ Sistema de reservas para lavado de coches exclusivo para trabajadores de SWAP EN
 - Sincronización automática cada 5 segundos entre todos los dispositivos
 - Días sin espacios disponibles se muestran en rojo y están deshabilitados
 
-### 🔄 Sincronización Global
+### 🔄 Sincronización Global MEJORADA
 - **Backend Node.js** en puerto 3001
 - **Base de datos JSON** centralizada (`reservas.json`)
 - **API REST** para gestión de reservas y espacios
 - **Actualización automática** cada 5 segundos
 - **Sincronización en tiempo real** entre todos los dispositivos
+- **Indicadores visuales** de estado de sincronización
+- **Notificaciones automáticas** de cambios en tiempo real
+- **Recuperación automática** ante pérdida de conexión
+- **Animaciones inteligentes** cuando cambian los espacios
+- **Sincronización inmediata** después de reservas
 
 ### 📱 Verificación WhatsApp
 - Códigos de verificación enviados por WhatsApp via n8n
@@ -90,13 +95,40 @@ DELETE /api/reservar/123456
 Response: { success: true, espaciosDisponibles: 6 }
 ```
 
-## Funcionamiento de Sincronización
+## Funcionamiento de Sincronización MEJORADO
 
+### 🔄 Sincronización Básica
 1. **Inicialización**: Al cargar la página, se inicializan 8 espacios para los próximos 12 miércoles
 2. **Sincronización Automática**: Cada 5 segundos se consulta el servidor para obtener espacios actualizados
 3. **Reserva en Tiempo Real**: Al confirmar una reserva, se reduce inmediatamente el contador global
 4. **Visualización Dinámica**: El calendario se actualiza automáticamente mostrando espacios disponibles
 5. **Prevención de Conflictos**: El servidor verifica disponibilidad antes de confirmar reservas
+
+### ✨ Nuevas Funcionalidades de Sincronización
+1. **Indicador Visual de Estado**: 
+   - 🟢 Verde: Sincronizado correctamente
+   - 🔵 Azul: Sincronizando datos
+   - 🔴 Rojo: Sin conexión
+   
+2. **Notificaciones Inteligentes**:
+   - Notifica cuando alguien más hace una reserva
+   - Muestra cambios en espacios disponibles
+   - Alerta sobre problemas de conexión
+   
+3. **Sincronización Adaptativa**:
+   - Sincronización inmediata después de reservas
+   - Sincronización al volver a la página activa
+   - Recuperación automática de conexión
+   
+4. **Animaciones en Tiempo Real**:
+   - Los números de espacios se animan al cambiar
+   - Los días del calendario "saltan" cuando se actualizan
+   - Efectos visuales para cambios importantes
+   
+5. **Robustez de Conexión**:
+   - Detecta pérdida de conexión a internet
+   - Reintenta automáticamente cada 10 segundos
+   - Funciona sin conexión mostrando último estado conocido
 
 ## Características Técnicas
 

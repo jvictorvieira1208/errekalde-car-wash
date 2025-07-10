@@ -188,27 +188,35 @@
                 const isHeadlightService = ['headlight-1', 'headlight-2'].includes(service);
                 
                 if (isHeadlightService) {
-                    // Deseleccionar otros servicios de faros
-                    document.querySelectorAll('.service-card[data-service="headlight-1"], .service-card[data-service="headlight-2"]').forEach(c => {
-                        c.classList.remove('selected');
-                    });
-                    
-                    // Remover servicios de faros anteriores
-                    const headlightIndices = [];
-                    selectedServices.forEach((s, i) => {
-                        if (['headlight-1', 'headlight-2'].includes(s)) {
-                            headlightIndices.push(i);
+                    // Si el faro ya está seleccionado, deseleccionarlo
+                    if (card.classList.contains('selected')) {
+                        card.classList.remove('selected');
+                        const serviceIndex = selectedServices.indexOf(service);
+                        if (serviceIndex > -1) {
+                            selectedServices.splice(serviceIndex, 1);
+                            selectedPrices.splice(serviceIndex, 1);
                         }
-                    });
-                    
-                    // Remover en orden inverso para mantener índices correctos
-                    headlightIndices.reverse().forEach(index => {
-                        selectedServices.splice(index, 1);
-                        selectedPrices.splice(index, 1);
-                    });
-                    
-                    // Agregar nuevo servicio de faro
-                    if (!card.classList.contains('selected')) {
+                    } else {
+                        // Deseleccionar otros servicios de faros
+                        document.querySelectorAll('.service-card[data-service="headlight-1"], .service-card[data-service="headlight-2"]').forEach(c => {
+                            c.classList.remove('selected');
+                        });
+                        
+                        // Remover servicios de faros anteriores
+                        const headlightIndices = [];
+                        selectedServices.forEach((s, i) => {
+                            if (['headlight-1', 'headlight-2'].includes(s)) {
+                                headlightIndices.push(i);
+                            }
+                        });
+                        
+                        // Remover en orden inverso para mantener índices correctos
+                        headlightIndices.reverse().forEach(index => {
+                            selectedServices.splice(index, 1);
+                            selectedPrices.splice(index, 1);
+                        });
+                        
+                        // Agregar nuevo servicio de faro
                         card.classList.add('selected');
                         selectedServices.push(service);
                         selectedPrices.push(price);
@@ -234,7 +242,9 @@
             } else {
                 const serviceNames = selectedServices.map(service => {
                     const card = document.querySelector(`[data-service="${service}"]`);
-                    return card.querySelector('strong').textContent;
+                    const name = card.querySelector('strong').textContent;
+                    const price = card.dataset.price;
+                    return `${name} ${price}€`;
                 });
                 servicesText = `<strong>Servicios seleccionados:</strong> ${serviceNames.join(', ')}`;
             }

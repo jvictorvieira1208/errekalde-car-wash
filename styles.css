@@ -174,6 +174,21 @@ body {
     font-size: 1.1rem;
 }
 
+/* Aviso de disponibilidad */
+.availability-notice {
+    background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+    color: #1e40af !important;
+    border: 2px solid #3b82f6;
+    border-radius: 12px;
+    padding: 12px 20px;
+    margin: 15px auto 25px auto;
+    font-weight: 600;
+    text-align: center;
+    font-size: 1.1rem;
+    max-width: 300px;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
+}
+
 /* Calendario */
 .calendar-container {
     background: white;
@@ -605,17 +620,7 @@ body {
     color: white;
 }
 
-.service-instructions {
-    text-align: center;
-    color: #6b7280;
-    font-size: 0.9rem;
-    margin-bottom: 20px;
-    padding: 15px;
-    background: linear-gradient(135deg, #dbeafe, #f0f9ff);
-    border-radius: 12px;
-    border: 2px solid #bfdbfe;
-    box-shadow: 0 2px 8px rgba(30, 58, 138, 0.1);
-}
+/* Removed service-instructions styles */
 
 .card-subtitle {
     font-size: 0.8rem;
@@ -1184,4 +1189,157 @@ body {
     color: #6b7280;
     margin-top: 8px;
     font-weight: 500;
+} 
+
+
+
+/* Animaciones mejoradas para sincronización */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes bounce {
+    0%, 20%, 53%, 80%, 100% {
+        animation-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
+        transform: translate3d(0,0,0);
+    }
+    40%, 43% {
+        animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+        transform: translate3d(0, -8px, 0);
+    }
+    70% {
+        animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+        transform: translate3d(0, -4px, 0);
+    }
+    90% {
+        transform: translate3d(0,-1px,0);
+    }
+}
+
+@keyframes fadeInUp {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Mejoras en el calendario para sincronización */
+.ios-calendar-day {
+    transition: all 0.3s ease;
+}
+
+.ios-calendar-day.updated {
+    animation: pulse 0.6s ease-in-out;
+}
+
+.spaces-available {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #059669;
+    background: rgba(16, 185, 129, 0.1);
+    padding: 2px 6px;
+    border-radius: 8px;
+    margin-top: 2px;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.ios-calendar-day.no-spaces .spaces-available {
+    color: #dc2626;
+    background: rgba(220, 38, 38, 0.1);
+}
+
+/* Notificaciones mejoradas para sincronización */
+.notification {
+    animation: fadeInUp 0.4s ease-out;
+}
+
+.notification.sync-notification {
+    border-left: 4px solid #3b82f6;
+    background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+}
+
+/* Indicadores de estado en tiempo real */
+.real-time-indicator {
+    position: relative;
+}
+
+.real-time-indicator::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    background: #10b981;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.real-time-indicator.updating::after {
+    background: #3b82f6;
+    animation: pulse 0.5s infinite;
+}
+
+/* Mejoras visuales para espacios disponibles */
+#availableSpaces {
+    transition: all 0.3s ease;
+    display: inline-block;
+}
+
+#availableSpaces.updating {
+    animation: pulse 0.5s ease-in-out;
+    color: #3b82f6;
+}
+
+
+
+/* Estado de carga mejorado */
+.loading-dots {
+    display: inline-block;
+}
+
+.loading-dots::after {
+    content: '';
+    animation: loadingDots 1.5s infinite;
+}
+
+@keyframes loadingDots {
+    0%, 20% { content: '.'; }
+    40% { content: '..'; }
+    60%, 100% { content: '...'; }
+}
+
+/* Mejoras en la página de calendario para mostrar sincronización */
+.calendar-header {
+    position: relative;
+}
+
+.sync-status {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 0.7rem;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.sync-status.active {
+    color: #10b981;
+}
+
+.sync-status.syncing {
+    color: #3b82f6;
+}
+
+.sync-status i {
+    font-size: 0.8rem;
 } 
