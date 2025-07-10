@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
+const https = require('https');
 
 const app = express();
 const PORT = 3001;
@@ -176,7 +177,102 @@ app.post('/api/inicializar-espacios', async (req, res) => {
     }
 });
 
+// Endpoint para enviar webhook a N8N (proxy para evitar CORS)
+app.post('/api/send-webhook', async (req, res) => {
+    try {
+        const webhookData = req.body;
+        console.log('🚀 Enviando webhook a N8N:', webhookData);
+        
+        // Configuración del webhook N8N
+        const N8N_WEBHOOK_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
+        const url = new URL(N8N_WEBHOOK_URL);
+        
+        const postData = JSON.stringify(webhookData);
+        
+        const options = {
+            hostname: url.hostname,
+            port: 443,
+            path: url.pathname,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData),
+                'User-Agent': 'ErrikaldeCarWash/1.0'
+            }
+        };
+        
+        // Hacer la llamada HTTPS
+        const webhookRequest = https.request(options, (webhookResponse) => {
+            let data = '';
+            
+            webhookResponse.on('data', (chunk) => {
+                data += chunk;
+            });
+            
+            webhookResponse.on('end', () => {
+                console.log('✅ Respuesta de N8N:', webhookResponse.statusCode, data);
+                console.log('📧 Headers de respuesta:', webhookResponse.headers);
+                
+                // Mostrar información específica para debug de WhatsApp
+                if (webhookData.type === 'booking') {
+                    console.log('📱 MENSAJE WHATSAPP ENVIADO:');
+                    console.log('   📞 Teléfono:', webhookData.phone);
+                    console.log('   📝 Tipo:', webhookData.type);
+                    console.log('   🆔 ID Reserva:', webhookData.reservationId);
+                    console.log('   ⚡ Status N8N:', webhookResponse.statusCode);
+                    
+                    if (webhookResponse.statusCode === 200) {
+                        console.log('   ✅ Webhook recibido por N8N correctamente');
+                        console.log('   🔍 PROBLEMA POSIBLE: El flujo de N8N no está enviando WhatsApp');
+                        console.log('   💡 SOLUCIÓN: Verificar configuración de WhatsApp en N8N');
+                    }
+                }
+                
+                if (webhookResponse.statusCode >= 200 && webhookResponse.statusCode < 300) {
+                    res.json({ 
+                        success: true, 
+                        status: webhookResponse.statusCode,
+                        response: data,
+                        debug: {
+                            phone: webhookData.phone,
+                            type: webhookData.type,
+                            reservationId: webhookData.reservationId,
+                            n8nStatus: webhookResponse.statusCode
+                        }
+                    });
+                } else {
+                    res.status(webhookResponse.statusCode).json({ 
+                        error: 'Error en webhook N8N',
+                        status: webhookResponse.statusCode,
+                        response: data 
+                    });
+                }
+            });
+        });
+        
+        webhookRequest.on('error', (error) => {
+            console.error('❌ Error enviando webhook:', error);
+            res.status(500).json({ 
+                error: 'Error de conexión con N8N',
+                details: error.message 
+            });
+        });
+        
+        // Enviar los datos
+        webhookRequest.write(postData);
+        webhookRequest.end();
+        
+    } catch (error) {
+        console.error('❌ Error en endpoint webhook:', error);
+        res.status(500).json({ 
+            error: 'Error interno del servidor',
+            details: error.message 
+        });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
     console.log('Sistema de sincronización de espacios activo');
+    console.log('Webhook proxy N8N disponible en /api/send-webhook');
 }); 

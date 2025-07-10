@@ -525,7 +525,7 @@ body {
 }
 
 .pricing-card.farol-card::before {
-    content: '➕ SERVICIO ADICIONAL';
+    content: '➕ SUPLEMENTOS';
     position: absolute;
     top: -10px;
     right: 20px;
@@ -1115,4 +1115,73 @@ body {
     .page {
         min-height: 350px;
     }
+} 
+
+/* Sección de notas */
+.notes-section {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 25px;
+    margin-top: 25px;
+    transition: all 0.3s ease;
+}
+
+.notes-section:hover {
+    border-color: #d1d5db;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.notes-section h3 {
+    color: #1f2937;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.notes-section h3 i {
+    color: #8b5cf6;
+    font-size: 1.3rem;
+}
+
+.notes-subtitle {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+
+.notes-section textarea {
+    width: 100%;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 15px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    background: white;
+    transition: all 0.3s ease;
+    resize: vertical;
+    min-height: 80px;
+}
+
+.notes-section textarea:focus {
+    outline: none;
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.notes-section textarea::placeholder {
+    color: #9ca3af;
+}
+
+.char-counter {
+    text-align: right;
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 8px;
+    font-weight: 500;
 } 

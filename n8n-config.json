@@ -1,6 +1,6 @@
 {
   "webhook": {
-    "url": "https://n8nserver.swapenergia.com/webhook/lavaderodecoches",
+    "url": "https://n8nserver.swapenergia.com/webhook/errekaldecarwash",
     "method": "POST",
     "contentType": "application/json"
   },

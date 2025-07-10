@@ -93,12 +93,28 @@
         </div>
         
         <div class="test-section">
-            <h3>Pulido de Faros (Opcional - Se puede combinar):</h3>
+            <h3>Pulido de Faros (Opcional - Solo UNO):</h3>
             <div class="service-card farol-card" data-service="headlight-1" data-price="35">
                 <strong>Un faro</strong> <span class="price">35€</span>
             </div>
             <div class="service-card farol-card" data-service="headlight-2" data-price="60">
                 <strong>Dos faros</strong> <span class="price">60€</span>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📝 Notas (Opcional):</h3>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                <textarea 
+                    id="notasTest" 
+                    placeholder="Ej: Coche muy sucio, mancha difícil en el asiento, etc."
+                    style="width: 100%; border: 2px solid #e5e7eb; border-radius: 8px; padding: 10px; font-size: 0.9rem; resize: vertical; min-height: 60px;"
+                    rows="3"
+                    maxlength="300"
+                ></textarea>
+                <div style="text-align: right; font-size: 0.8rem; color: #6b7280; margin-top: 5px;">
+                    <span id="charCountTest">0</span>/300 caracteres
+                </div>
             </div>
         </div>
         
@@ -119,10 +135,30 @@
     <script>
         let selectedServices = [];
         let selectedPrices = [];
+        let notas = '';
         
         // Agregar event listeners
         document.querySelectorAll('.service-card').forEach(card => {
             card.addEventListener('click', () => selectService(card));
+        });
+        
+        // Event listener para las notas
+        document.addEventListener('DOMContentLoaded', function() {
+            const notasTextarea = document.getElementById('notasTest');
+            const charCountElement = document.getElementById('charCountTest');
+            
+            notasTextarea.addEventListener('input', function() {
+                notas = this.value;
+                charCountElement.textContent = this.value.length;
+                
+                if (this.value.length > 280) {
+                    charCountElement.style.color = '#dc2626';
+                } else {
+                    charCountElement.style.color = '#6b7280';
+                }
+                
+                updateSelectedServices();
+            });
         });
         
         function selectService(card) {
@@ -148,18 +184,35 @@
                 selectedServices.push(service);
                 selectedPrices.push(price);
             } else {
-                // Toggle para servicios de faros
-                if (card.classList.contains('selected')) {
-                    card.classList.remove('selected');
-                    const index = selectedServices.indexOf(service);
-                    if (index > -1) {
+                // Para servicios de faros, solo uno puede estar seleccionado
+                const isHeadlightService = ['headlight-1', 'headlight-2'].includes(service);
+                
+                if (isHeadlightService) {
+                    // Deseleccionar otros servicios de faros
+                    document.querySelectorAll('.service-card[data-service="headlight-1"], .service-card[data-service="headlight-2"]').forEach(c => {
+                        c.classList.remove('selected');
+                    });
+                    
+                    // Remover servicios de faros anteriores
+                    const headlightIndices = [];
+                    selectedServices.forEach((s, i) => {
+                        if (['headlight-1', 'headlight-2'].includes(s)) {
+                            headlightIndices.push(i);
+                        }
+                    });
+                    
+                    // Remover en orden inverso para mantener índices correctos
+                    headlightIndices.reverse().forEach(index => {
                         selectedServices.splice(index, 1);
                         selectedPrices.splice(index, 1);
+                    });
+                    
+                    // Agregar nuevo servicio de faro
+                    if (!card.classList.contains('selected')) {
+                        card.classList.add('selected');
+                        selectedServices.push(service);
+                        selectedPrices.push(price);
                     }
-                } else {
-                    card.classList.add('selected');
-                    selectedServices.push(service);
-                    selectedPrices.push(price);
                 }
             }
             
@@ -174,15 +227,24 @@
         
         function updateSelectedServices() {
             const servicesDiv = document.getElementById('selectedServices');
+            
+            let servicesText = '';
             if (selectedServices.length === 0) {
-                servicesDiv.innerHTML = '<strong>Servicios seleccionados:</strong> Ninguno';
+                servicesText = '<strong>Servicios seleccionados:</strong> Ninguno';
             } else {
                 const serviceNames = selectedServices.map(service => {
                     const card = document.querySelector(`[data-service="${service}"]`);
                     return card.querySelector('strong').textContent;
                 });
-                servicesDiv.innerHTML = `<strong>Servicios seleccionados:</strong> ${serviceNames.join(', ')}`;
+                servicesText = `<strong>Servicios seleccionados:</strong> ${serviceNames.join(', ')}`;
             }
+            
+            let notasText = '';
+            if (notas && notas.trim()) {
+                notasText = `<br><strong>Notas adicionales:</strong> ${notas}`;
+            }
+            
+            servicesDiv.innerHTML = servicesText + notasText;
         }
         
         function resetSelection() {
@@ -191,6 +253,10 @@
             });
             selectedServices = [];
             selectedPrices = [];
+            notas = '';
+            document.getElementById('notasTest').value = '';
+            document.getElementById('charCountTest').textContent = '0';
+            document.getElementById('charCountTest').style.color = '#6b7280';
             updateTotal();
             updateSelectedServices();
         }

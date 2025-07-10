@@ -47,7 +47,7 @@ const VEHICLE_DATABASE = {
 };
 
 // Configuración de n8n
-const N8N_WEBHOOK_URL = 'https://n8nserver.swapenergia.com/webhook/lavaderodecoches';
+const N8N_WEBHOOK_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
 const N8N_VALIDATION_URL = 'https://n8nserver.swapenergia.com/webhook/validarNúmero';
 
 // Variables globales
@@ -66,7 +66,8 @@ let reservationData = {
     carSize: '',
     services: [], // Array para múltiples servicios
     serviceNames: [], // Array para nombres de servicios
-    price: 0
+    price: 0,
+    notas: '' // Campo para notas adicionales
 };
 
 // Configuración del servidor
@@ -124,6 +125,18 @@ function setupEventListeners() {
     // Detección de tamaño de vehículo
     document.getElementById('car-brand').addEventListener('input', detectVehicleSize);
     document.getElementById('car-model').addEventListener('input', detectVehicleSize);
+    
+    // Botón de test webhook N8N
+    document.getElementById('testWebhookBtn').addEventListener('click', async () => {
+        showNotification('🧪 Probando webhook N8N...', 'info');
+        const resultado = await verificarEstadoWebhook();
+        
+        if (resultado.success) {
+            showNotification('✅ Webhook N8N funcionando correctamente', 'success');
+        } else {
+            showNotification(`❌ Error en webhook N8N: ${resultado.error || 'Error desconocido'}`, 'error');
+        }
+    });
 }
 
 // Sistema de navegación de páginas
@@ -449,7 +462,7 @@ function loadPricingSection() {
     
     pricingSection.innerHTML = `
         <h3>Precios para vehículos ${sizeName.toLowerCase()}s</h3>
-        <p class="service-instructions">💡 Selecciona UN tipo de limpieza + OPCIONALMENTE pulido de faros. Puedes combinar ambos servicios.</p>
+        <p class="service-instructions">💡 Selecciona UN tipo de limpieza + OPCIONALMENTE UN pulido de faro. Solo puedes elegir un faro a la vez.</p>
         <div class="pricing-grid">
             <div class="pricing-card">
                 <h3><i class="fas fa-car"></i> Servicios de Limpieza</h3>
@@ -463,13 +476,28 @@ function loadPricingSection() {
             </div>
             <div class="pricing-card farol-card">
                 <h3><i class="fas fa-lightbulb"></i> Pulido de Faros (Opcional)</h3>
-                <p class="card-subtitle">✅ Se puede combinar con cualquier limpieza:</p>
+                <p class="card-subtitle">✅ Elige solo UNO (se puede combinar con limpieza):</p>
                 <ul>
                     <li data-service="headlight-1" data-price="${PRICES.headlight['headlight-1']}">Un faro <strong>${PRICES.headlight['headlight-1']}€</strong></li>
                     <li data-service="headlight-2" data-price="${PRICES.headlight['headlight-2']}">Dos faros <strong>${PRICES.headlight['headlight-2']}€</strong></li>
                 </ul>
             </div>
         </div>
+        
+        <div class="notes-section">
+            <h3><i class="fas fa-sticky-note"></i> Notas</h3>
+            <p class="notes-subtitle">¿Alguna información adicional sobre tu vehículo? (Opcional)</p>
+            <textarea 
+                id="notasAdicionales" 
+                placeholder="Ej: Coche muy sucio, mancha difícil en el asiento, etc."
+                rows="3"
+                maxlength="300"
+            >${reservationData.notas}</textarea>
+            <div class="char-counter">
+                <span id="charCount">${reservationData.notas.length}</span>/300 caracteres
+            </div>
+        </div>
+        
         <div class="selected-services-summary">
             <h4>Servicios Seleccionados:</h4>
             <div id="selectedServicesList">Ningún servicio seleccionado</div>
@@ -482,6 +510,21 @@ function loadPricingSection() {
     // Agregar event listeners para selección de servicios
     pricingSection.querySelectorAll('li').forEach(li => {
         li.addEventListener('click', () => selectService(li));
+    });
+    
+    // Agregar event listener para las notas
+    const notasTextarea = document.getElementById('notasAdicionales');
+    const charCountElement = document.getElementById('charCount');
+    
+    notasTextarea.addEventListener('input', function() {
+        reservationData.notas = this.value;
+        charCountElement.textContent = this.value.length;
+        
+        if (this.value.length > 280) {
+            charCountElement.style.color = '#dc2626';
+        } else {
+            charCountElement.style.color = '#6b7280';
+        }
     });
 }
 
@@ -508,17 +551,25 @@ function selectService(serviceElement) {
         reservationData.services.push(serviceType);
         reservationData.serviceNames.push(serviceName);
     } else {
-        // Para servicios de faros, toggle selección
-        if (serviceElement.classList.contains('selected')) {
-            serviceElement.classList.remove('selected');
-            // Remover del array
-            reservationData.services = reservationData.services.filter(s => s !== serviceType);
-            reservationData.serviceNames = reservationData.serviceNames.filter(name => name !== serviceName);
-        } else {
-            serviceElement.classList.add('selected');
-            // Agregar al array
-            reservationData.services.push(serviceType);
-            reservationData.serviceNames.push(serviceName);
+        // Para servicios de faros, solo uno puede estar seleccionado
+        const isHeadlightService = ['headlight-1', 'headlight-2'].includes(serviceType);
+        
+        if (isHeadlightService) {
+            // Deseleccionar otros servicios de faros
+            document.querySelectorAll('.pricing-card li[data-service="headlight-1"], .pricing-card li[data-service="headlight-2"]').forEach(li => {
+                li.classList.remove('selected');
+            });
+            
+            // Remover servicios de faros anteriores del array
+            reservationData.services = reservationData.services.filter(s => !['headlight-1', 'headlight-2'].includes(s));
+            reservationData.serviceNames = reservationData.serviceNames.filter(name => !name.includes('faro'));
+            
+            // Si el elemento clicado no estaba seleccionado, seleccionarlo
+            if (!serviceElement.classList.contains('selected')) {
+                serviceElement.classList.add('selected');
+                reservationData.services.push(serviceType);
+                reservationData.serviceNames.push(serviceName);
+            }
         }
     }
     
@@ -556,6 +607,15 @@ function updateSelectedServicesSummary() {
 function generateReservationSummary() {
     const summary = document.getElementById('reservation-summary');
     
+    let notasSection = '';
+    if (reservationData.notas && reservationData.notas.trim()) {
+        notasSection = `
+        <div class="summary-item">
+            <span class="summary-label">Notas adicionales:</span>
+            <span class="summary-value">${reservationData.notas}</span>
+        </div>`;
+    }
+    
     summary.innerHTML = `
         <h3>Resumen de tu Reserva</h3>
         <div class="summary-item">
@@ -582,7 +642,7 @@ function generateReservationSummary() {
         <div class="summary-item">
             <span class="summary-label">Servicios:</span>
             <span class="summary-value">${reservationData.serviceNames.join(', ')}</span>
-        </div>
+        </div>${notasSection}
         <div class="summary-item">
             <span class="summary-label">Precio total:</span>
             <span class="summary-value">${reservationData.price}€</span>
@@ -669,7 +729,8 @@ function handleNewReservation() {
         carSize: '',
         services: [],
         serviceNames: [],
-        price: 0
+        price: 0,
+        notas: ''
     };
     
     // Limpiar formularios
@@ -725,33 +786,40 @@ async function sendVerificationCode(phone, code) {
 }
 
 async function sendBookingConfirmation(reservationData) {
-    try {
-        // Generar ID de reserva único
-        const reservationId = `RESERVA-${Date.now()}`;
-        
-        // Formatear servicios
-        let serviciosTexto = reservationData.serviceNames.join(' + ');
-        
-        // Detectar suplementos
-        let suplementos = "Ninguno";
-        if (reservationData.services.some(service => service.includes('headlight'))) {
-            suplementos = reservationData.services
-                .filter(service => service.includes('headlight'))
-                .map(service => service === 'headlight-1' ? 'Un faro' : 'Dos faros')
-                .join(', ');
-        }
-        
-        // Mensaje con el formato exacto solicitado
-        const mensajeWhatsApp = `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗
+    // Generar ID de reserva único
+    const reservationId = `RESERVA-${Date.now()}`;
+    
+    // Formatear servicios
+    let serviciosTexto = reservationData.serviceNames.join(' + ');
+    
+    // Detectar suplementos
+    let suplementos = "Ninguno";
+    if (reservationData.services.some(service => service.includes('headlight'))) {
+        suplementos = reservationData.services
+            .filter(service => service.includes('headlight'))
+            .map(service => service === 'headlight-1' ? 'Un faro' : 'Dos faros')
+            .join(', ');
+    }
+    
+    // Agregar notas si existen
+    let notasTexto = '';
+    if (reservationData.notas && reservationData.notas.trim()) {
+        notasTexto = `📝 *Notas adicionales:* ${reservationData.notas}
+
+`;
+    }
+    
+    // Mensaje con el formato exacto solicitado
+    const mensajeWhatsApp = `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗
 
 ✅ Hola ${reservationData.name}, tu reserva está confirmada
 
 📅 *Fecha:* ${selectedDate.toLocaleDateString('es-ES', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        })}
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    })}
 🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón
 
 👤 *Cliente:* ${reservationData.name}
@@ -762,7 +830,7 @@ async function sendBookingConfirmation(reservationData) {
 💰 *Precio Total:* ${reservationData.price}€
 🆔 *ID Reserva:* ${reservationId}
 
-📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*
+${notasTexto}📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*
 🏢 *Ubicación:* Pabellón SWAP ENERGIA
 🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00
 🕐 *No hay horario específico de lavado*
@@ -770,49 +838,127 @@ async function sendBookingConfirmation(reservationData) {
 *¡Gracias por usar nuestro servicio!* 🤝
 
 _Servicio exclusivo para empleados SWAP ENERGIA_ ✨`;
+    
+    const payload = {
+        phone: reservationData.phone,
+        message: mensajeWhatsApp,
+        type: 'booking',
+        reservationId: reservationId,
+        reservationData: {
+            name: reservationData.name,
+            phone: reservationData.phone,
+            date: selectedDate.toLocaleDateString('es-ES', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            }),
+            vehicle: `${reservationData.carBrand} ${reservationData.carModel}`,
+            services: serviciosTexto,
+            supplements: suplementos,
+            price: reservationData.price,
+            vehicleSize: reservationData.carSize,
+            notes: reservationData.notas || ''
+        }
+    };
+    
+    console.log('🔍 DEBUG - Payload enviado a N8N:', JSON.stringify(payload, null, 2));
+    
+    // Enviar a través del servidor backend (evita problemas CORS)
+    const response = await fetch(`${SERVER_URL}/api/send-webhook`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+    });
+    
+    console.log('🔍 DEBUG - Respuesta del servidor:', response.status, response.statusText);
+    
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ ERROR - Respuesta del servidor:', errorData);
+        throw new Error(errorData.error || 'Error en la comunicación con n8n');
+    }
+    
+    const responseData = await response.json();
+    console.log('✅ DEBUG - Datos de respuesta completos:', responseData);
+    
+    return responseData;
+}
+
+// Función para verificar el estado del webhook N8N
+async function verificarEstadoWebhook() {
+    try {
+        console.log('🔍 Verificando estado del webhook N8N...');
         
-        const payload = {
-            mensajeWhatsApp: mensajeWhatsApp
+        const testPayload = {
+            phone: '+34600123456',
+            message: '🧪 TEST WEBHOOK - ' + new Date().toLocaleString(),
+            type: 'test',
+            reservationId: 'TEST-' + Date.now(),
+            timestamp: new Date().toISOString(),
+            reservationData: {
+                name: 'Test Usuario',
+                phone: '+34600123456',
+                date: 'Test Date',
+                vehicle: 'Test Vehicle',
+                services: 'Test Service',
+                supplements: 'Ninguno',
+                price: 0,
+                vehicleSize: 'test'
+            }
         };
         
-        console.log('Enviando al webhook:', N8N_WEBHOOK_URL);
-        console.log('Payload:', payload);
+        console.log('📤 Enviando test payload:', testPayload);
         
-        const response = await fetch(N8N_WEBHOOK_URL, {
+        const response = await fetch(`${SERVER_URL}/api/send-webhook`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(testPayload)
         });
         
-        console.log('Respuesta del webhook:', response.status, response.statusText);
+        console.log('📥 Respuesta HTTP:', response.status, response.statusText);
         
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Error del webhook:', errorText);
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        const responseData = await response.json();
+        console.log('📊 Estado del webhook:', {
+            status: response.status,
+            statusText: response.statusText,
+            response: responseData
+        });
+        
+        // Análisis del resultado
+        if (response.ok && responseData.debug) {
+            console.log('🔍 DEBUG INFO:');
+            console.log('   📞 Teléfono enviado:', responseData.debug.phone);
+            console.log('   📝 Tipo:', responseData.debug.type);
+            console.log('   ⚡ Status N8N:', responseData.debug.n8nStatus);
+            
+            if (responseData.debug.n8nStatus === 200) {
+                console.log('   ✅ N8N recibe el webhook correctamente');
+                console.log('   ❓ POSIBLE PROBLEMA: Configuración de WhatsApp en N8N');
+                showNotification('✅ N8N recibe datos OK. Revisar config WhatsApp en N8N', 'warning');
+            }
         }
         
-        // Intentar parsear la respuesta como JSON, pero no fallar si no es JSON
-        let result;
-        try {
-            result = await response.json();
-        } catch (e) {
-            result = { success: true, status: response.status };
-        }
-        
-        console.log('Webhook enviado exitosamente:', result);
-        return result;
+        return {
+            success: response.ok,
+            status: response.status,
+            data: responseData,
+            n8nReceived: response.ok && responseData.debug?.n8nStatus === 200
+        };
         
     } catch (error) {
-        console.error('Error completo al enviar webhook:', error);
-        // No lanzar el error para que no bloquee el flujo de confirmación
-        showNotification('Reserva confirmada. El WhatsApp puede tardar unos momentos.', 'warning');
-        return { error: error.message };
+        console.error('❌ Error verificando webhook:', error);
+        return {
+            success: false,
+            error: error.message
+        };
     }
 }
+
 
 // Sistema de notificaciones
 function showNotification(message, type = 'info') {
