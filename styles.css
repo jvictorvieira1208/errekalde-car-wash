@@ -798,86 +798,7 @@ body {
     }
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .container {
-        padding: 15px;
-    }
-    
-    .header {
-        flex-direction: column;
-        text-align: center;
-        padding: 20px;
-    }
-    
-    .logo h1 {
-        font-size: 1.8rem;
-    }
-    
-    .page-navigation {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .nav-step {
-        flex-direction: row;
-        gap: 15px;
-    }
-    
-    .page-content {
-        padding: 25px;
-    }
-    
-    .calendar-container {
-        padding: 20px;
-    }
-    
-    .info-cards {
-        grid-template-columns: 1fr;
-    }
-    
-    .pricing-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .btn {
-        width: 100%;
-        justify-content: center;
-        margin-right: 0;
-    }
-    
-    .page-actions {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .notifications {
-        left: 20px;
-        right: 20px;
-        max-width: none;
-    }
-}
-
-@media (max-width: 480px) {
-    .logo h1 {
-        font-size: 1.5rem;
-    }
-    
-    .page-content h2 {
-        font-size: 1.5rem;
-    }
-    
-    .calendar-weekdays div,
-    .calendar-day {
-        font-size: 0.8rem;
-        padding: 8px;
-    }
-    
-    .info-card {
-        flex-direction: column;
-        text-align: center;
-    }
-}
+/* Responsive - Media queries ordenadas de mayor a menor */
 
 /* Animaciones adicionales */
 .fade-in {
@@ -1342,4 +1263,996 @@ body {
 
 .sync-status i {
     font-size: 0.8rem;
+} 
+
+/* =================
+   DISEÑO RESPONSIVO MEJORADO
+   ================= */
+
+/* Tablets y pantallas medianas (769px - 1024px) */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .container {
+        padding: 20px;
+        max-width: 95%;
+    }
+    
+    .header {
+        padding: 25px 20px;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+    
+    .logo h1 {
+        font-size: 2.2rem;
+    }
+    
+    .page-content {
+        padding: 30px 25px;
+    }
+    
+    .page-content h2 {
+        font-size: 2rem;
+    }
+    
+    .ios-calendar {
+        max-width: 450px;
+    }
+    
+    .info-cards {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+    }
+    
+    .pricing-grid {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    
+    .pricing-card {
+        padding: 22px;
+    }
+    
+    .btn {
+        padding: 14px 28px;
+        font-size: 1rem;
+    }
+    
+    .page-actions {
+        justify-content: center;
+        gap: 20px;
+    }
+}
+
+/* Tablets pequeñas y móviles grandes (481px - 768px) */
+@media (max-width: 768px) and (min-width: 481px) {
+    .container {
+        padding: 15px;
+        margin: 0 auto;
+        max-width: 100%;
+    }
+    
+    .header {
+        flex-direction: column;
+        text-align: center;
+        padding: 20px 15px;
+        gap: 15px;
+    }
+    
+    .logo h1 {
+        font-size: 1.9rem;
+        margin: 0;
+    }
+    
+    .swap-badge {
+        font-size: 0.85rem;
+        padding: 8px 16px;
+    }
+    
+    .page-navigation {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 0 10px;
+        justify-content: center;
+    }
+    
+    .nav-step {
+        flex: 1;
+        min-width: 120px;
+        max-width: 200px;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 8px;
+        text-align: center;
+    }
+    
+    .step-number {
+        width: 32px;
+        height: 32px;
+        font-size: 0.9rem;
+        margin: 0 auto;
+    }
+    
+    .step-label {
+        font-size: 0.8rem;
+        text-align: center;
+    }
+    
+    .page-content {
+        padding: 25px 20px;
+        margin: 10px 0;
+    }
+    
+    .page-content h2 {
+        font-size: 1.7rem;
+        text-align: center;
+        margin-bottom: 25px;
+    }
+    
+    /* Calendario manteniendo diseño iOS */
+    .ios-calendar {
+        max-width: 90%;
+        margin: 0 auto 20px auto;
+        padding: 20px 15px 15px 15px;
+    }
+    
+    .ios-calendar-header span {
+        font-size: 1.1rem;
+    }
+    
+    .ios-calendar-nav {
+        padding: 8px 12px;
+        font-size: 1rem;
+    }
+    
+    .ios-calendar-day {
+        width: 42px;
+        height: 50px;
+    }
+    
+    .ios-calendar-day .day-number {
+        font-size: 0.9rem;
+    }
+    
+    .ios-calendar-day .spaces-available {
+        font-size: 0.6rem;
+    }
+    
+    /* Información de fecha - mantener estilo */
+    .selected-date-info {
+        text-align: center;
+        padding: 15px;
+        margin: 15px 0;
+    }
+    
+    /* Tarjetas de información - layout horizontal */
+    .info-cards {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .info-card {
+        padding: 18px;
+        flex-direction: row;
+        align-items: center;
+        text-align: left;
+    }
+    
+    .info-icon {
+        margin-right: 18px;
+        margin-bottom: 0;
+        width: 45px;
+        height: 45px;
+        flex-shrink: 0;
+    }
+    
+    .info-icon i {
+        font-size: 1.2rem;
+    }
+    
+    /* Formularios - mantener estilo */
+    .form-section {
+        margin-bottom: 25px;
+    }
+    
+    .input-group {
+        margin-bottom: 18px;
+    }
+    
+    .input-group input {
+        padding: 14px;
+        font-size: 0.95rem;
+    }
+    
+    /* Precios - layout en columna pero manteniendo diseño */
+    .pricing-grid {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+    
+    .pricing-card {
+        padding: 18px;
+    }
+    
+    .pricing-card h3 {
+        font-size: 1.15rem;
+    }
+    
+    .pricing-card li {
+        padding: 13px;
+        font-size: 0.9rem;
+    }
+    
+    /* Notas - mantener estilo */
+    .notes-section {
+        padding: 18px;
+        margin-top: 18px;
+    }
+    
+    .notes-section textarea {
+        padding: 12px;
+        min-height: 65px;
+    }
+    
+    /* Servicios seleccionados */
+    .selected-services-summary {
+        padding: 16px;
+        margin-top: 16px;
+    }
+    
+    /* Botones - full width en móviles */
+    .btn {
+        width: 100%;
+        justify-content: center;
+        margin-right: 0;
+        padding: 14px 20px;
+        font-size: 0.95rem;
+    }
+    
+    .page-actions {
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 20px;
+    }
+    
+    /* Resumen de reserva */
+    .reservation-summary {
+        padding: 18px;
+        margin-bottom: 18px;
+    }
+    
+    .summary-item {
+        padding: 12px 0;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+    
+    .summary-label {
+        font-size: 0.85rem;
+        flex: 1;
+    }
+    
+    .summary-value {
+        font-size: 0.9rem;
+        flex: 2;
+        text-align: right;
+    }
+    
+    /* Notificaciones */
+    .notifications {
+        left: 15px;
+        right: 15px;
+        top: 15px;
+        max-width: none;
+    }
+    
+    .notification {
+        padding: 14px;
+        font-size: 0.85rem;
+    }
+}
+
+/* Móviles medianos (375px - 480px) */
+@media (max-width: 480px) and (min-width: 376px) {
+    .container {
+        padding: 10px;
+    }
+    
+    .header {
+        padding: 15px 10px;
+    }
+    
+    .logo h1 {
+        font-size: 1.7rem;
+    }
+    
+    .swap-badge {
+        font-size: 0.75rem;
+        padding: 6px 12px;
+    }
+    
+    .page-content {
+        padding: 20px 15px;
+    }
+    
+    .page-content h2 {
+        font-size: 1.6rem;
+        margin-bottom: 15px;
+    }
+    
+    /* Calendario para móviles medianos */
+    .ios-calendar {
+        padding: 15px 10px 10px 10px;
+        border-radius: 15px;
+    }
+    
+    .ios-calendar-header span {
+        font-size: 1.1rem;
+    }
+    
+    .ios-calendar-nav {
+        padding: 8px 10px;
+        font-size: 1rem;
+    }
+    
+    .ios-calendar-weekdays {
+        gap: 4px;
+        padding: 0 5px;
+    }
+    
+    .ios-calendar-weekdays div {
+        font-size: 0.7rem;
+        padding: 6px 2px;
+    }
+    
+    .ios-calendar-days {
+        gap: 4px;
+        padding: 0 5px;
+    }
+    
+    .ios-calendar-day {
+        width: 40px;
+        height: 48px;
+        border-radius: 6px;
+    }
+    
+    .ios-calendar-day .day-number {
+        font-size: 0.9rem;
+    }
+    
+    .ios-calendar-day .spaces-available {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+    
+    /* Información */
+    .info-card {
+        padding: 15px;
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .info-icon {
+        margin-right: 0;
+        margin-bottom: 10px;
+        width: 45px;
+        height: 45px;
+    }
+    
+    .info-content h3 {
+        font-size: 1.1rem;
+    }
+    
+    .info-content p {
+        font-size: 0.9rem;
+    }
+    
+    /* Formularios */
+    .input-group input {
+        padding: 12px;
+        font-size: 0.9rem;
+    }
+    
+    /* Precios */
+    .pricing-card {
+        padding: 15px;
+    }
+    
+    .pricing-card h3 {
+        font-size: 1.1rem;
+        margin-bottom: 15px;
+    }
+    
+    .pricing-card li {
+        padding: 12px;
+        font-size: 0.9rem;
+    }
+    
+    /* Notas */
+    .notes-section {
+        padding: 15px;
+    }
+    
+    .notes-section h3 {
+        font-size: 1.1rem;
+    }
+    
+    .notes-section textarea {
+        padding: 10px;
+        min-height: 60px;
+        font-size: 0.85rem;
+    }
+    
+    /* Servicios seleccionados compactos */
+    .selected-services-summary {
+        padding: 12px;
+    }
+    
+    .selected-services-summary h4 {
+        font-size: 1rem;
+    }
+    
+    .selected-service-item {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+    }
+    
+    .total-price {
+        font-size: 1rem;
+    }
+    
+    /* Botones compactos */
+    .btn {
+        padding: 10px 12px;
+        font-size: 0.85rem;
+    }
+    
+    /* Resumen compacto */
+    .reservation-summary {
+        padding: 12px;
+    }
+    
+    .reservation-summary h3 {
+        font-size: 1.2rem;
+    }
+    
+    .summary-item {
+        padding: 8px 0;
+    }
+    
+    .summary-label {
+        font-size: 0.8rem;
+    }
+    
+    .summary-value {
+        font-size: 0.9rem;
+    }
+}
+
+/* Móviles muy pequeños (321px - 375px) */
+@media (max-width: 375px) and (min-width: 321px) {
+    .container {
+        padding: 8px;
+        max-width: 100%;
+    }
+    
+    .header {
+        padding: 12px 8px;
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+    
+    .logo h1 {
+        font-size: 1.4rem;
+    }
+    
+    .swap-badge {
+        font-size: 0.7rem;
+        padding: 5px 10px;
+    }
+    
+    .page-navigation {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 5px;
+        padding: 0 5px;
+        justify-content: center;
+    }
+    
+    .nav-step {
+        flex: 1;
+        min-width: 80px;
+        max-width: 120px;
+        flex-direction: column;
+        gap: 4px;
+        padding: 6px 4px;
+        text-align: center;
+    }
+    
+    .step-number {
+        width: 24px;
+        height: 24px;
+        font-size: 0.7rem;
+        margin: 0 auto;
+    }
+    
+    .step-label {
+        font-size: 0.65rem;
+        text-align: center;
+    }
+    
+    .page-content {
+        padding: 15px 10px;
+    }
+    
+    .page-content h2 {
+        font-size: 1.3rem;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+    
+    /* Calendario ultra compacto pero funcional */
+    .ios-calendar {
+        max-width: 98%;
+        padding: 12px 8px 8px 8px;
+        border-radius: 12px;
+        margin: 0 auto 12px auto;
+    }
+    
+    .ios-calendar-header span {
+        font-size: 0.95rem;
+    }
+    
+    .ios-calendar-nav {
+        padding: 5px 8px;
+        font-size: 0.85rem;
+    }
+    
+    .ios-calendar-weekdays {
+        gap: 3px;
+        margin-bottom: 10px;
+    }
+    
+    .ios-calendar-weekdays div {
+        font-size: 0.65rem;
+        padding: 4px 1px;
+    }
+    
+    .ios-calendar-days {
+        gap: 3px;
+    }
+    
+    .ios-calendar-day {
+        width: 34px;
+        height: 42px;
+    }
+    
+    .ios-calendar-day .day-number {
+        font-size: 0.75rem;
+    }
+    
+    .ios-calendar-day .spaces-available {
+        font-size: 0.5rem;
+        padding: 0px 2px;
+    }
+    
+    /* Info cards */
+    .info-cards {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .info-card {
+        padding: 12px;
+        flex-direction: row;
+        align-items: center;
+        text-align: left;
+    }
+    
+    .info-icon {
+        margin-right: 12px;
+        margin-bottom: 0;
+        width: 35px;
+        height: 35px;
+        flex-shrink: 0;
+    }
+    
+    .info-icon i {
+        font-size: 0.9rem;
+    }
+    
+    .info-content h3 {
+        font-size: 0.9rem;
+    }
+    
+    .info-content p {
+        font-size: 0.8rem;
+    }
+    
+    /* Formularios */
+    .form-section {
+        margin-bottom: 18px;
+    }
+    
+    .input-group {
+        margin-bottom: 12px;
+    }
+    
+    .input-group input {
+        padding: 10px;
+        font-size: 0.85rem;
+    }
+    
+    /* Precios */
+    .pricing-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .pricing-card {
+        padding: 12px;
+    }
+    
+    .pricing-card h3 {
+        font-size: 0.95rem;
+    }
+    
+    .pricing-card li {
+        padding: 10px;
+        font-size: 0.8rem;
+    }
+    
+    /* Notas */
+    .notes-section {
+        padding: 12px;
+        margin-top: 12px;
+    }
+    
+    .notes-section h3 {
+        font-size: 0.95rem;
+    }
+    
+    .notes-section textarea {
+        padding: 8px;
+        min-height: 55px;
+        font-size: 0.8rem;
+    }
+    
+    /* Botones */
+    .btn {
+        width: 100%;
+        padding: 10px 15px;
+        font-size: 0.8rem;
+        justify-content: center;
+    }
+    
+    .page-actions {
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 15px;
+    }
+    
+    /* Servicios seleccionados */
+    .selected-services-summary {
+        padding: 12px;
+        margin-top: 12px;
+    }
+    
+    .selected-services-summary h4 {
+        font-size: 0.9rem;
+    }
+    
+    /* Resumen de reserva */
+    .reservation-summary {
+        padding: 12px;
+        margin-bottom: 12px;
+    }
+    
+    .reservation-summary h3 {
+        font-size: 1rem;
+    }
+    
+    .summary-item {
+        padding: 8px 0;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+    
+    .summary-label {
+        font-size: 0.75rem;
+        flex: 1;
+    }
+    
+    .summary-value {
+        font-size: 0.8rem;
+        flex: 2;
+        text-align: right;
+    }
+    
+    /* Notificaciones */
+    .notifications {
+        left: 8px;
+        right: 8px;
+        top: 8px;
+    }
+    
+    .notification {
+        padding: 10px;
+        font-size: 0.75rem;
+    }
+}
+
+/* Móviles muy pequeños (320px y menos) */
+@media (max-width: 320px) {
+    .container {
+        padding: 5px;
+        max-width: 100%;
+    }
+    
+    .header {
+        padding: 10px 5px;
+        flex-direction: column;
+        text-align: center;
+        gap: 8px;
+    }
+    
+    .logo h1 {
+        font-size: 1.2rem;
+    }
+    
+    .swap-badge {
+        font-size: 0.65rem;
+        padding: 4px 8px;
+    }
+    
+    .page-navigation {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 3px;
+        padding: 0 3px;
+        justify-content: center;
+    }
+    
+    .nav-step {
+        flex: 1;
+        min-width: 70px;
+        max-width: 100px;
+        flex-direction: column;
+        gap: 3px;
+        padding: 5px 3px;
+        text-align: center;
+    }
+    
+    .step-number {
+        width: 20px;
+        height: 20px;
+        font-size: 0.6rem;
+        margin: 0 auto;
+    }
+    
+    .step-label {
+        font-size: 0.6rem;
+        text-align: center;
+    }
+    
+    .page-content {
+        padding: 12px 8px;
+    }
+    
+    .page-content h2 {
+        font-size: 1.1rem;
+        margin-bottom: 12px;
+        text-align: center;
+    }
+    
+    /* Calendario mínimo pero funcional */
+    .ios-calendar {
+        max-width: 100%;
+        padding: 8px 5px 5px 5px;
+        border-radius: 8px;
+        margin: 0 auto 10px auto;
+    }
+    
+    .ios-calendar-header span {
+        font-size: 0.8rem;
+    }
+    
+    .ios-calendar-nav {
+        padding: 4px 6px;
+        font-size: 0.7rem;
+    }
+    
+    .ios-calendar-weekdays {
+        gap: 2px;
+        margin-bottom: 8px;
+    }
+    
+    .ios-calendar-weekdays div {
+        font-size: 0.55rem;
+        padding: 3px 1px;
+    }
+    
+    .ios-calendar-days {
+        gap: 2px;
+    }
+    
+    .ios-calendar-day {
+        width: 28px;
+        height: 36px;
+    }
+    
+    .ios-calendar-day .day-number {
+        font-size: 0.65rem;
+    }
+    
+    .ios-calendar-day .spaces-available {
+        font-size: 0.45rem;
+        padding: 0px 1px;
+    }
+    
+    /* Info cards mínimas */
+    .info-cards {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .info-card {
+        padding: 8px;
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .info-icon {
+        margin-right: 0;
+        margin-bottom: 8px;
+        width: 30px;
+        height: 30px;
+    }
+    
+    .info-icon i {
+        font-size: 0.8rem;
+    }
+    
+    .info-content h3 {
+        font-size: 0.8rem;
+    }
+    
+    .info-content p {
+        font-size: 0.7rem;
+    }
+    
+    /* Todo lo demás ultra compacto */
+    .form-section {
+        margin-bottom: 15px;
+    }
+    
+    .input-group {
+        margin-bottom: 10px;
+    }
+    
+    .input-group input {
+        padding: 8px;
+        font-size: 0.8rem;
+    }
+    
+    .pricing-card {
+        padding: 8px;
+    }
+    
+    .pricing-card h3 {
+        font-size: 0.85rem;
+    }
+    
+    .pricing-card li {
+        padding: 8px;
+        font-size: 0.75rem;
+    }
+    
+    .btn {
+        width: 100%;
+        padding: 8px 12px;
+        font-size: 0.75rem;
+    }
+    
+    .page-actions {
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 12px;
+    }
+    
+    .reservation-summary {
+        padding: 8px;
+    }
+    
+    .summary-item {
+        padding: 6px 0;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+    
+    .summary-label {
+        font-size: 0.7rem;
+    }
+    
+    .summary-value {
+        font-size: 0.75rem;
+    }
+    
+    .notifications {
+        left: 5px;
+        right: 5px;
+        top: 5px;
+    }
+    
+    .notification {
+        padding: 8px;
+        font-size: 0.7rem;
+    }
+}
+
+/* Optimizaciones adicionales para Touch */
+@media (hover: none) and (pointer: coarse) {
+    /* Elementos táctiles más grandes en dispositivos touch */
+    .btn {
+        min-height: 44px;
+    }
+    
+    .pricing-card li {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .ios-calendar-day {
+        min-height: 44px;
+    }
+    
+    .nav-step {
+        min-height: 44px;
+    }
+    
+    /* Eliminar hover effects en dispositivos touch */
+    .pricing-card:hover,
+    .btn:hover,
+    .info-card:hover,
+    .notes-section:hover {
+        transform: none;
+        box-shadow: inherit;
+    }
+}
+
+/* Landscape orientation para móviles */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+    .header {
+        padding: 10px 15px;
+    }
+    
+    .logo h1 {
+        font-size: 1.4rem;
+    }
+    
+    .page-content {
+        padding: 15px;
+    }
+    
+    .ios-calendar {
+        max-width: 90%;
+    }
+    
+    .ios-calendar-day {
+        width: 35px;
+        height: 40px;
+    }
+    
+    .info-cards {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    }
+    
+    .pricing-grid {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
 } 

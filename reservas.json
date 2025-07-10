@@ -12,7 +12,7 @@
     "2025-09-17": 8,
     "2025-09-24": 8,
     "2025-10-01": 8,
-    "2025-07-15": 7
+    "2025-07-15": 6
   },
   "reservas": [
     {
@@ -35,6 +35,27 @@
       "price": 155,
       "notas": "Hola",
       "timestamp": "2025-07-10T12:07:03.143Z"
+    },
+    {
+      "id": "1752151279970",
+      "fecha": "2025-07-15",
+      "date": null,
+      "name": "Joao",
+      "phone": "+34671354119",
+      "carBrand": "audi",
+      "carModel": "a8",
+      "carSize": "large",
+      "services": [
+        "complete-fabric",
+        "headlight-2"
+      ],
+      "serviceNames": [
+        "Limpieza completa con tapicería",
+        "Dos faros"
+      ],
+      "price": 155,
+      "notas": "hola",
+      "timestamp": "2025-07-10T12:41:19.970Z"
     }
   ]
 }
