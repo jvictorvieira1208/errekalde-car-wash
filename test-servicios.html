@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Servicios Múltiples - Errekalde Car Wash</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+        .service-card {
+            background: #f8fafc;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #1e3a8a;
+        }
+        .service-card.selected {
+            background: #dbeafe;
+            border-left-color: #3b82f6;
+        }
+        .farol-card {
+            background: #fef3c7 !important;
+            border-left-color: #f59e0b !important;
+        }
+        .farol-card.selected {
+            background: #fde68a !important;
+            border-left-color: #f59e0b !important;
+        }
+        .price {
+            font-weight: bold;
+            color: #1e3a8a;
+        }
+        .total {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #059669;
+            margin-top: 20px;
+            padding: 15px;
+            background: #d1fae5;
+            border-radius: 8px;
+            text-align: center;
+        }
+        button {
+            background: #1e3a8a;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Test Servicios Múltiples</h1>
+        <p>Prueba la selección de limpieza + pulido de faros juntos</p>
+        
+        <div class="test-section">
+            <h3>Servicios de Limpieza (Elige UNO):</h3>
+            <div class="service-card" data-service="interior" data-price="23">
+                <strong>Limpieza interior</strong> <span class="price">23€</span>
+            </div>
+            <div class="service-card" data-service="exterior" data-price="20">
+                <strong>Limpieza exterior</strong> <span class="price">20€</span>
+            </div>
+            <div class="service-card" data-service="complete" data-price="40">
+                <strong>Limpieza completa</strong> <span class="price">40€</span>
+            </div>
+            <div class="service-card" data-service="complete-fabric" data-price="85">
+                <strong>Limpieza completa con tapicería</strong> <span class="price">85€</span>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Pulido de Faros (Opcional - Se puede combinar):</h3>
+            <div class="service-card farol-card" data-service="headlight-1" data-price="35">
+                <strong>Un faro</strong> <span class="price">35€</span>
+            </div>
+            <div class="service-card farol-card" data-service="headlight-2" data-price="60">
+                <strong>Dos faros</strong> <span class="price">60€</span>
+            </div>
+        </div>
+        
+        <div class="total" id="totalPrice">
+            Precio Total: 0€
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <button onclick="resetSelection()">Resetear Selección</button>
+            <button onclick="testCombination()">Probar Combinación</button>
+        </div>
+        
+        <div id="selectedServices" style="margin-top: 20px; padding: 15px; background: #f8fafc; border-radius: 8px;">
+            <strong>Servicios seleccionados:</strong> Ninguno
+        </div>
+    </div>
+
+    <script>
+        let selectedServices = [];
+        let selectedPrices = [];
+        
+        // Agregar event listeners
+        document.querySelectorAll('.service-card').forEach(card => {
+            card.addEventListener('click', () => selectService(card));
+        });
+        
+        function selectService(card) {
+            const service = card.dataset.service;
+            const price = parseInt(card.dataset.price);
+            const serviceName = card.querySelector('strong').textContent;
+            
+            // Verificar si es servicio de limpieza
+            const isCleaningService = ['interior', 'exterior', 'complete', 'complete-fabric'].includes(service);
+            
+            if (isCleaningService) {
+                // Deseleccionar otros servicios de limpieza
+                document.querySelectorAll('.service-card[data-service="interior"], .service-card[data-service="exterior"], .service-card[data-service="complete"], .service-card[data-service="complete-fabric"]').forEach(c => {
+                    c.classList.remove('selected');
+                });
+                
+                // Remover servicios de limpieza anteriores
+                selectedServices = selectedServices.filter(s => !['interior', 'exterior', 'complete', 'complete-fabric'].includes(s));
+                selectedPrices = selectedPrices.filter((p, i) => !['interior', 'exterior', 'complete', 'complete-fabric'].includes(selectedServices[i]));
+                
+                // Agregar nuevo servicio de limpieza
+                card.classList.add('selected');
+                selectedServices.push(service);
+                selectedPrices.push(price);
+            } else {
+                // Toggle para servicios de faros
+                if (card.classList.contains('selected')) {
+                    card.classList.remove('selected');
+                    const index = selectedServices.indexOf(service);
+                    if (index > -1) {
+                        selectedServices.splice(index, 1);
+                        selectedPrices.splice(index, 1);
+                    }
+                } else {
+                    card.classList.add('selected');
+                    selectedServices.push(service);
+                    selectedPrices.push(price);
+                }
+            }
+            
+            updateTotal();
+            updateSelectedServices();
+        }
+        
+        function updateTotal() {
+            const total = selectedPrices.reduce((sum, price) => sum + price, 0);
+            document.getElementById('totalPrice').textContent = `Precio Total: ${total}€`;
+        }
+        
+        function updateSelectedServices() {
+            const servicesDiv = document.getElementById('selectedServices');
+            if (selectedServices.length === 0) {
+                servicesDiv.innerHTML = '<strong>Servicios seleccionados:</strong> Ninguno';
+            } else {
+                const serviceNames = selectedServices.map(service => {
+                    const card = document.querySelector(`[data-service="${service}"]`);
+                    return card.querySelector('strong').textContent;
+                });
+                servicesDiv.innerHTML = `<strong>Servicios seleccionados:</strong> ${serviceNames.join(', ')}`;
+            }
+        }
+        
+        function resetSelection() {
+            document.querySelectorAll('.service-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            selectedServices = [];
+            selectedPrices = [];
+            updateTotal();
+            updateSelectedServices();
+        }
+        
+        function testCombination() {
+            resetSelection();
+            
+            // Simular selección de limpieza completa + 2 faros
+            setTimeout(() => {
+                document.querySelector('[data-service="complete"]').click();
+            }, 500);
+            
+            setTimeout(() => {
+                document.querySelector('[data-service="headlight-2"]').click();
+            }, 1000);
+        }
+    </script>
+</body>
+</html> 

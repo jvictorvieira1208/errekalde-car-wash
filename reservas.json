@@ -1,0 +1,38 @@
+{
+  "espacios": {
+    "2025-07-16": 8,
+    "2025-07-23": 8,
+    "2025-07-30": 8,
+    "2025-08-06": 8,
+    "2025-08-13": 8,
+    "2025-08-20": 8,
+    "2025-08-27": 8,
+    "2025-09-03": 8,
+    "2025-09-10": 8,
+    "2025-09-17": 8,
+    "2025-09-24": 8,
+    "2025-07-15": 7
+  },
+  "reservas": [
+    {
+      "id": "1752065376704",
+      "fecha": "2025-07-15",
+      "date": null,
+      "name": "Joao",
+      "phone": "+34671354119",
+      "carBrand": "bmw",
+      "carModel": "x6",
+      "carSize": "large",
+      "services": [
+        "complete-fabric",
+        "headlight-2"
+      ],
+      "serviceNames": [
+        "Limpieza completa con tapicería 95",
+        "Dos faros 60"
+      ],
+      "price": 155,
+      "timestamp": "2025-07-09T12:49:36.704Z"
+    }
+  ]
+}

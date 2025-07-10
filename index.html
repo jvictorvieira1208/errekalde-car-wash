@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Errekalde Car Wash - SWAP ENERGIA</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-car-wash"></i>
+                <h1>Errekalde Car Wash</h1>
+            </div>
+            <div class="swap-badge">
+                <i class="fas fa-users"></i>
+                Solo para trabajadores de SWAP ENERGIA
+            </div>
+        </header>
+        <!-- Página 1: Calendario estilo iOS -->
+        <div id="page-1" class="page active">
+            <div class="page-content">
+                <h2><i class="fas fa-calendar-alt"></i> Selecciona tu Fecha</h2>
+                <div class="ios-calendar">
+                    <div class="ios-calendar-header">
+                        <button id="prevMonth" class="ios-calendar-nav"><i class="fas fa-chevron-left"></i></button>
+                        <span id="currentMonth"></span>
+                        <button id="nextMonth" class="ios-calendar-nav"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <div class="ios-calendar-weekdays">
+                        <div>Lun</div>
+                        <div>Mar</div>
+                        <div>Mié</div>
+                        <div>Jue</div>
+                        <div>Vie</div>
+                        <div>Sáb</div>
+                        <div>Dom</div>
+                    </div>
+                    <div class="ios-calendar-days" id="calendarDays"></div>
+                </div>
+                <div class="selected-date-info">
+                    <h3>Fecha seleccionada: <span id="selectedDate">Ninguna</span></h3>
+                    <p>Espacios disponibles: <span id="availableSpaces">8</span></p>
+                </div>
+                <div class="page-actions">
+                    <button id="nextToPage2" class="btn btn-primary" disabled>Continuar <i class="fas fa-arrow-right"></i></button>
+                </div>
+            </div>
+        </div>
+        <!-- Página 2: Información -->
+        <div id="page-2" class="page">
+            <div class="page-content">
+                <h2><i class="fas fa-info-circle"></i> Información Importante</h2>
+                
+                <div class="info-cards">
+                    <div class="info-card">
+                        <div class="info-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="info-content">
+                            <h3>Servicio Exclusivo</h3>
+                            <p>Este servicio está disponible únicamente para trabajadores de <strong>SWAP ENERGIA</strong>.</p>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="info-content">
+                            <h3>Entrega de Llaves</h3>
+                            <p>Las llaves se entregarán entre las <strong>8:00 y las 9:00 de la mañana en el pabellón</strong>.</p>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="info-content">
+                            <h3>Cargo por Suciedad</h3>
+                            <p>Se cobrará <strong>10€ extra</strong> por exceso de suciedad en el vehículo.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="page-actions">
+                    <button id="prevToPage1" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Anterior
+                    </button>
+                    <button id="nextToPage3" class="btn btn-primary">
+                        <i class="fas fa-arrow-right"></i>
+                        Continuar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Página 3: Datos Personales y Vehículo -->
+        <div id="page-3" class="page">
+            <div class="page-content">
+                <h2><i class="fas fa-user"></i> Datos Personales y Vehículo</h2>
+                
+                <form id="personal-form" class="form">
+                    <div class="form-section">
+                        <h3><i class="fas fa-mobile-alt"></i> Datos de Contacto</h3>
+                        
+                        <div class="input-group">
+                            <label for="name">Nombre completo:</label>
+                            <input type="text" id="name" name="name" placeholder="Tu nombre completo" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="phone">Número de teléfono:</label>
+                            <input type="tel" id="phone" name="phone" placeholder="+34 600 000 000" required>
+                        </div>
+
+                        <button type="button" id="sendCode" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i>
+                            Enviar código de verificación
+                        </button>
+                    </div>
+
+                    <div id="verification-section" class="form-section hidden">
+                        <h3><i class="fas fa-key"></i> Verificación</h3>
+                        
+                        <div class="input-group">
+                            <label for="verification-code">Código de verificación:</label>
+                            <input type="text" id="verification-code" name="code" placeholder="123456" maxlength="6" required>
+                        </div>
+
+                        <button type="button" id="verifyCode" class="btn btn-primary">
+                            <i class="fas fa-check"></i>
+                            Verificar código
+                        </button>
+                        <button type="button" id="resendCode" class="btn btn-secondary">
+                            <i class="fas fa-redo"></i>
+                            Reenviar código
+                        </button>
+                    </div>
+
+                    <div id="vehicle-section" class="form-section hidden">
+                        <h3><i class="fas fa-car"></i> Información del Vehículo</h3>
+                        
+                        <div class="input-group">
+                            <label for="car-brand">Marca del vehículo:</label>
+                            <input type="text" id="car-brand" name="carBrand" placeholder="Ej: Toyota, BMW, Ford..." required>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="car-model">Modelo del vehículo:</label>
+                            <input type="text" id="car-model" name="carModel" placeholder="Ej: Corolla, X3, Focus..." required>
+                        </div>
+
+                        <div class="vehicle-size-display">
+                            <h4>Tamaño detectado: <span id="detectedSize">--</span></h4>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="page-actions">
+                    <button id="prevToPage2" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Anterior
+                    </button>
+                    <button id="nextToPage4" class="btn btn-primary" disabled>
+                        <i class="fas fa-arrow-right"></i>
+                        Continuar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Página 4: Servicios y Precios -->
+        <div id="page-4" class="page">
+            <div class="page-content">
+                <h2><i class="fas fa-tags"></i> Servicios y Precios</h2>
+                <p>Selecciona el tipo de limpieza según el tamaño de tu vehículo</p>
+
+                <div id="pricing-section" class="pricing-section">
+                    <!-- Los precios se cargan dinámicamente según el tamaño del vehículo -->
+                </div>
+
+                <div class="page-actions">
+                    <button id="prevToPage3" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Anterior
+                    </button>
+                    <button id="nextToPage5" class="btn btn-primary" disabled>
+                        <i class="fas fa-arrow-right"></i>
+                        Continuar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Página 5: Confirmación -->
+        <div id="page-5" class="page">
+            <div class="page-content">
+                <h2><i class="fas fa-check-circle"></i> Confirmar Reserva</h2>
+                
+                <div id="reservation-summary" class="reservation-summary">
+                    <!-- El resumen se genera dinámicamente -->
+                </div>
+
+                <div class="page-actions">
+                    <button id="prevToPage4" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Anterior
+                    </button>
+                    <button id="confirmReservation" class="btn btn-success">
+                        <i class="fas fa-check"></i>
+                        Confirmar Reserva
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Página de Confirmación Exitosa -->
+        <div id="success-page" class="page">
+            <div class="page-content">
+                <div class="success-message">
+                    <div class="success-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h2>¡Reserva Confirmada!</h2>
+                    <p>Tu reserva ha sido procesada correctamente. Recibirás una confirmación por WhatsApp.</p>
+                    
+                    <div id="final-summary" class="final-summary">
+                        <!-- Resumen final de la reserva -->
+                    </div>
+                </div>
+
+                <div class="page-actions">
+                    <button id="newReservation" class="btn btn-primary">
+                        <i class="fas fa-plus"></i>
+                        Hacer Nueva Reserva
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notificaciones -->
+        <div id="notifications" class="notifications"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 

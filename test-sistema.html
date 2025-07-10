@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Sistema Errekalde Car Wash</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .result {
+            background: #e8f5e8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #ffe8e8;
+            color: #d32f2f;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Sistema Errekalde Car Wash</h1>
+    
+    <div class="test-section">
+        <h2>1. Test Sincronización Global</h2>
+        <button onclick="testSync()">Probar Sincronización</button>
+        <div id="sync-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Test Espacios Disponibles</h2>
+        <button onclick="testEspacios()">Probar Espacios</button>
+        <div id="espacios-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Test Crear Reserva</h2>
+        <button onclick="testReserva()">Crear Reserva de Prueba</button>
+        <div id="reserva-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. Test Inicializar Espacios</h2>
+        <button onclick="testInicializar()">Inicializar Espacios</button>
+        <div id="inicializar-result" class="result"></div>
+    </div>
+
+    <script>
+        const SERVER_URL = 'http://localhost:3001';
+        
+        async function testSync() {
+            const resultDiv = document.getElementById('sync-result');
+            try {
+                const response = await fetch(`${SERVER_URL}/api/sync-espacios`);
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <strong>✅ Sincronización exitosa</strong><br>
+                    <strong>Timestamp:</strong> ${data.timestamp}<br>
+                    <strong>Espacios:</strong> ${Object.keys(data.espacios).length} fechas configuradas<br>
+                    <strong>Ejemplo:</strong> ${JSON.stringify(Object.entries(data.espacios).slice(0, 3))}
+                `;
+                resultDiv.className = 'result';
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testEspacios() {
+            const resultDiv = document.getElementById('espacios-result');
+            try {
+                const today = new Date();
+                const nextWednesday = new Date(today);
+                const daysUntilWednesday = (3 - today.getDay() + 7) % 7;
+                nextWednesday.setDate(today.getDate() + daysUntilWednesday);
+                const fechaStr = nextWednesday.toISOString().split('T')[0];
+                
+                const response = await fetch(`${SERVER_URL}/api/espacios/${fechaStr}`);
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <strong>✅ Espacios obtenidos</strong><br>
+                    <strong>Fecha:</strong> ${data.fecha}<br>
+                    <strong>Espacios disponibles:</strong> ${data.espacios}/8
+                `;
+                resultDiv.className = 'result';
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testReserva() {
+            const resultDiv = document.getElementById('reserva-result');
+            try {
+                const today = new Date();
+                const nextWednesday = new Date(today);
+                const daysUntilWednesday = (3 - today.getDay() + 7) % 7;
+                nextWednesday.setDate(today.getDate() + daysUntilWednesday);
+                const fechaStr = nextWednesday.toISOString().split('T')[0];
+                
+                const reservaData = {
+                    fecha: fechaStr,
+                    name: 'Test Usuario',
+                    phone: '+34600000000',
+                    carBrand: 'Toyota',
+                    carModel: 'Corolla',
+                    carSize: 'medium',
+                    serviceType: 'complete',
+                    serviceName: 'Limpieza Completa',
+                    price: 40
+                };
+                
+                const response = await fetch(`${SERVER_URL}/api/reservar`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(reservaData)
+                });
+                
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <strong>✅ Reserva creada</strong><br>
+                    <strong>ID:</strong> ${data.reserva.id}<br>
+                    <strong>Fecha:</strong> ${data.reserva.fecha}<br>
+                    <strong>Espacios restantes:</strong> ${data.espaciosDisponibles}/8
+                `;
+                resultDiv.className = 'result';
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testInicializar() {
+            const resultDiv = document.getElementById('inicializar-result');
+            try {
+                const response = await fetch(`${SERVER_URL}/api/inicializar-espacios`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <strong>✅ Espacios inicializados</strong><br>
+                    <strong>Fechas configuradas:</strong> ${Object.keys(data.espacios).length}<br>
+                    <strong>Ejemplo:</strong> ${JSON.stringify(Object.entries(data.espacios).slice(0, 3))}
+                `;
+                resultDiv.className = 'result';
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // Auto-test al cargar la página
+        window.onload = function() {
+            setTimeout(testSync, 1000);
+        };
+    </script>
+</body>
+</html> 

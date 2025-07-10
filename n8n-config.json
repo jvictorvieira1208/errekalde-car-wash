@@ -1,0 +1,84 @@
+{
+  "webhook": {
+    "url": "https://n8nserver.swapenergia.com/webhook/lavaderodecoches",
+    "method": "POST",
+    "contentType": "application/json"
+  },
+  "whatsapp": {
+    "provider": "whatsapp-business-api",
+    "phoneNumber": "+34XXXXXXXXX",
+    "businessAccount": "swap-energia"
+  },
+  "messageTemplates": {
+    "verification": {
+      "type": "verification",
+      "template": "🔐 Código de verificación Errekalde Car Wash\n\nTu código de verificación es: {code}\n\nEste código es válido para acceder al sistema de reservas de SWAP ENERGIA.",
+      "variables": ["code"]
+    },
+    "booking": {
+      "type": "booking",
+      "template": "✅ Reserva confirmada - Errekalde Car Wash\n\n🚗 Vehículo: {carType}\n🧽 Servicio: {serviceType}\n💰 Precio: {price}€\n⏰ Fecha: {timestamp}\n\n📍 Las llaves se entregarán entre las 8:00 y las 9:00 de la mañana en el pabellón.\n⚠️ Se cobrará 10€ extra por exceso de suciedad.\n\n¡Gracias por usar nuestro servicio!",
+      "variables": ["carType", "serviceType", "price", "timestamp"]
+    }
+  },
+  "dataStructure": {
+    "verification": {
+      "phone": "string (required)",
+      "message": "string (required)",
+      "type": "verification (required)"
+    },
+    "booking": {
+      "phone": "string (required)",
+      "message": "string (required)",
+      "type": "booking (required)",
+      "bookingData": {
+        "carType": "string (required)",
+        "serviceType": "string (required)",
+        "price": "number (required)",
+        "timestamp": "string (required)"
+      }
+    }
+  },
+  "validation": {
+    "phone": {
+      "pattern": "^(\\+34|34)?[6789]\\d{8}$",
+      "description": "Número de teléfono español válido"
+    },
+    "code": {
+      "pattern": "^\\d{6}$",
+      "description": "Código de 6 dígitos"
+    }
+  },
+  "pricing": {
+    "small": {
+      "interior": 20,
+      "exterior": 18,
+      "complete": 35,
+      "complete-fabric": 75
+    },
+    "medium": {
+      "interior": 23,
+      "exterior": 20,
+      "complete": 40,
+      "complete-fabric": 85
+    },
+    "large": {
+      "interior": 25,
+      "exterior": 23,
+      "complete": 45,
+      "complete-fabric": 95
+    },
+    "headlight": {
+      "headlight-1": 35,
+      "headlight-2": 60
+    }
+  },
+  "settings": {
+    "maxRetries": 3,
+    "timeout": 10000,
+    "rateLimit": {
+      "requests": 10,
+      "window": 60000
+    }
+  }
+} 
