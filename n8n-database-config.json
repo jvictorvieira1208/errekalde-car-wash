@@ -1,0 +1,230 @@
+{
+  "name": "Errekalde Car Wash - Base de Datos Centralizada",
+  "description": "Configuración completa de N8N como base de datos universal para gestionar espacios y reservas",
+  "version": "2.0",
+  "webhooks": {
+    "spaces_management": {
+      "url": "https://n8nserver.swapenergia.com/webhook/errekaldecarwash-spaces",
+      "description": "Gestión centralizada de espacios disponibles",
+      "operations": {
+        "get_spaces": {
+          "method": "POST",
+          "description": "Obtener todos los espacios disponibles",
+          "payload": {
+            "action": "get_spaces",
+            "timestamp": "number",
+            "cache_buster": "string",
+            "source": "string",
+            "device_id": "string"
+          },
+          "response": {
+            "espacios": {
+              "2025-07-16": 8,
+              "2025-07-23": 7,
+              "2025-07-30": 8
+            },
+            "timestamp": "2025-07-11T10:00:00.000Z",
+            "total_fechas": 12,
+            "total_espacios": 96
+          }
+        },
+        "save_spaces": {
+          "method": "POST",
+          "description": "Guardar espacios actualizados",
+          "payload": {
+            "action": "save_spaces",
+            "espacios": {
+              "2025-07-16": 7,
+              "2025-07-23": 6,
+              "2025-07-30": 8
+            },
+            "timestamp": "number",
+            "cache_buster": "string",
+            "source": "string",
+            "device_id": "string"
+          },
+          "response": {
+            "success": true,
+            "message": "Espacios guardados exitosamente",
+            "timestamp": "2025-07-11T10:00:00.000Z"
+          }
+        }
+      }
+    },
+    "reservations_management": {
+      "url": "https://n8nserver.swapenergia.com/webhook/errekaldecarwash",
+      "description": "Gestión centralizada de reservas",
+      "operations": {
+        "create_reservation": {
+          "method": "POST",
+          "description": "Crear nueva reserva",
+          "payload": {
+            "action": "create_reservation",
+            "reserva": {
+              "id": "RESERVA-1752224299809",
+              "fecha": "2025-07-16",
+              "name": "Usuario Test",
+              "phone": "+34600000000",
+              "carBrand": "Toyota",
+              "carModel": "Corolla",
+              "carSize": "medium",
+              "services": ["complete"],
+              "price": 25,
+              "timestamp": "2025-07-11T10:00:00.000Z",
+              "espacios_antes": 8,
+              "espacios_despues": 7,
+              "device_id": "DEV_1752224299_abc123"
+            },
+            "timestamp": "number",
+            "cache_buster": "string",
+            "source": "string"
+          },
+          "response": {
+            "success": true,
+            "reserva_id": "RESERVA-1752224299809",
+            "message": "Reserva creada exitosamente",
+            "espacios_restantes": 7
+          }
+        }
+      }
+    },
+    "verification": {
+      "url": "https://n8nserver.swapenergia.com/webhook/validarNúmero",
+      "description": "Envío de códigos de verificación por WhatsApp",
+      "method": "POST",
+      "payload": {
+        "phone": "+34600000000",
+        "message": "🔐 Código de verificación: 123456",
+        "type": "verification",
+        "code": "123456"
+      }
+    }
+  },
+  "database_structure": {
+    "espacios_centralizados": {
+      "description": "Almacén centralizado de espacios disponibles",
+      "storage": "n8n_global_variable",
+      "format": {
+        "key": "errekalde_espacios_global",
+        "value": {
+          "espacios": {
+            "2025-07-16": 8,
+            "2025-07-23": 8,
+            "2025-07-30": 8,
+            "2025-08-06": 8,
+            "2025-08-13": 8,
+            "2025-08-20": 8,
+            "2025-08-27": 8,
+            "2025-09-03": 8,
+            "2025-09-10": 8,
+            "2025-09-17": 8,
+            "2025-09-24": 8,
+            "2025-10-01": 8
+          },
+          "last_updated": "2025-07-11T10:00:00.000Z",
+          "total_reservas": 0,
+          "version": "2.0"
+        }
+      }
+    },
+    "reservas_centralizadas": {
+      "description": "Almacén centralizado de todas las reservas",
+      "storage": "n8n_global_variable",
+      "format": {
+        "key": "errekalde_reservas_global",
+        "value": {
+          "reservas": [],
+          "contador": 0,
+          "last_updated": "2025-07-11T10:00:00.000Z"
+        }
+      }
+    }
+  },
+  "workflow_logic": {
+    "espacios_webhook": {
+      "trigger": "Webhook recibe POST a /errekaldecarwash-spaces",
+      "steps": [
+        {
+          "step": 1,
+          "description": "Validar payload",
+          "action": "Check if action is 'get_spaces' or 'save_spaces'"
+        },
+        {
+          "step": 2,
+          "description": "Get_spaces: Obtener datos",
+          "action": "Read global variable 'errekalde_espacios_global'"
+        },
+        {
+          "step": 3,
+          "description": "Save_spaces: Guardar datos",
+          "action": "Update global variable 'errekalde_espacios_global' with new spaces"
+        },
+        {
+          "step": 4,
+          "description": "Responder con datos",
+          "action": "Return JSON response with spaces data"
+        },
+        {
+          "step": 5,
+          "description": "Log operación",
+          "action": "Log operation for debugging"
+        }
+      ]
+    },
+    "reservas_webhook": {
+      "trigger": "Webhook recibe POST a /errekaldecarwash",
+      "steps": [
+        {
+          "step": 1,
+          "description": "Validar reserva",
+          "action": "Check if action is 'create_reservation'"
+        },
+        {
+          "step": 2,
+          "description": "Verificar espacios",
+          "action": "Check available spaces for the date"
+        },
+        {
+          "step": 3,
+          "description": "Crear reserva",
+          "action": "Add reservation to global variable 'errekalde_reservas_global'"
+        },
+        {
+          "step": 4,
+          "description": "Actualizar espacios",
+          "action": "Decrease available spaces by 1"
+        },
+        {
+          "step": 5,
+          "description": "Enviar WhatsApp",
+          "action": "Send WhatsApp confirmation message"
+        },
+        {
+          "step": 6,
+          "description": "Responder éxito",
+          "action": "Return success response"
+        }
+      ]
+    }
+  },
+  "sync_strategy": {
+    "description": "Estrategia de sincronización para múltiples dispositivos",
+    "frequency": "Cada 3 segundos desde cada dispositivo",
+    "conflict_resolution": "Last write wins",
+    "consistency": "Eventually consistent",
+    "backup": "N8N global variables with automatic persistence"
+  },
+  "initialization": {
+    "default_spaces": {
+      "description": "Espacios iniciales cuando no hay datos",
+      "spaces_per_wednesday": 8,
+      "weeks_ahead": 12,
+      "only_wednesdays": true
+    }
+  },
+  "monitoring": {
+    "logs": "All operations logged in N8N",
+    "metrics": ["Total reservations", "Spaces used", "Device count"],
+    "alerts": "When spaces reach 0 or errors occur"
+  }
+} 

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /var/
+Disallow: /vendor/
+
+Sitemap: https://errekalde-car-wash.surge.sh/sitemap.xml
+
+# Crawler-delay for respectful crawling
+Crawl-delay: 1 

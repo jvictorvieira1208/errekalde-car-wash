@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗄️ Test N8N - Base de Datos Centralizada</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .conectado { background: #4CAF50; }
+        .desconectado { background: #f44336; }
+        .sincronizando { background: #ff9800; animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .test-section h2 {
+            margin-top: 0;
+            font-size: 1.8em;
+            color: #FFD700;
+        }
+        .button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        .button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #4CAF50;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .result.error {
+            border-left-color: #f44336;
+            background: rgba(244, 67, 54, 0.1);
+        }
+        .result.warning {
+            border-left-color: #ff9800;
+            background: rgba(255, 152, 0, 0.1);
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .info-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+        .info-card h3 {
+            margin: 0 0 10px 0;
+            color: #FFD700;
+        }
+        .info-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .logs {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .auto-refresh {
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+        }
+        .auto-refresh.active {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗄️ Test N8N - Base de Datos Centralizada</h1>
+        
+        <div class="test-section">
+            <h2>📊 Estado del Sistema</h2>
+            <div class="info-grid">
+                <div class="info-card">
+                    <h3>Estado N8N</h3>
+                    <div class="value">
+                        <span class="status-indicator" id="statusIndicator"></span>
+                        <span id="statusText">Verificando...</span>
+                    </div>
+                </div>
+                <div class="info-card">
+                    <h3>Última Sincronización</h3>
+                    <div class="value" id="lastSync">--:--:--</div>
+                </div>
+                <div class="info-card">
+                    <h3>Espacios Totales</h3>
+                    <div class="value" id="totalSpaces">-</div>
+                </div>
+                <div class="info-card">
+                    <h3>Dispositivos Conectados</h3>
+                    <div class="value" id="connectedDevices">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Pruebas de Funcionalidad</h2>
+            <div class="toolbar">
+                <button class="button" onclick="testGetSpaces()">📥 Obtener Espacios</button>
+                <button class="button" onclick="testSaveSpaces()">💾 Guardar Espacios</button>
+                <button class="button" onclick="testCreateReservation()">🎫 Crear Reserva</button>
+                <button class="button" onclick="testSync()">🔄 Sincronizar</button>
+                <button class="button auto-refresh" id="autoRefreshBtn" onclick="toggleAutoRefresh()">⏰ Auto-Refresh</button>
+            </div>
+            <div id="testResults" class="result">Presiona cualquier botón para ejecutar una prueba...</div>
+        </div>
+
+        <div class="test-section">
+            <h2>📈 Monitoreo en Tiempo Real</h2>
+            <div class="toolbar">
+                <button class="button" onclick="startMonitoring()">▶️ Iniciar Monitoreo</button>
+                <button class="button" onclick="stopMonitoring()">⏹️ Detener Monitoreo</button>
+                <button class="button" onclick="clearLogs()">🗑️ Limpiar Logs</button>
+            </div>
+            <div id="monitoringLogs" class="logs">
+                <div>📝 Logs de monitoreo aparecerán aquí...</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔧 Configuración Actual</h2>
+            <div class="result">
+                <strong>URLs N8N:</strong>
+                • Espacios: https://n8nserver.swapenergia.com/webhook/errekaldecarwash-spaces
+                • Reservas: https://n8nserver.swapenergia.com/webhook/errekaldecarwash
+                • Verificación: https://n8nserver.swapenergia.com/webhook/validarNúmero
+                
+                <strong>Entorno:</strong> <span id="environment">Detectando...</span>
+                <strong>Device ID:</strong> <span id="deviceId">Generando...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración
+        const N8N_SPACES_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash-spaces';
+        const N8N_WEBHOOK_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
+        const CACHE_BUSTER = 'REALTIMESYNC2024_TEST';
+        
+        // Variables globales
+        let isMonitoring = false;
+        let monitoringInterval = null;
+        let autoRefreshInterval = null;
+        let deviceId = generateDeviceId();
+        let lastSpacesData = null;
+        
+        // Elementos DOM
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const lastSync = document.getElementById('lastSync');
+        const totalSpaces = document.getElementById('totalSpaces');
+        const connectedDevices = document.getElementById('connectedDevices');
+        const testResults = document.getElementById('testResults');
+        const monitoringLogs = document.getElementById('monitoringLogs');
+        const autoRefreshBtn = document.getElementById('autoRefreshBtn');
+        
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            updateEnvironmentInfo();
+            testConnection();
+            startAutoRefresh();
+        });
+        
+        function generateDeviceId() {
+            let id = localStorage.getItem('test_device_id');
+            if (!id) {
+                id = 'TEST_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('test_device_id', id);
+            }
+            return id;
+        }
+        
+        function updateEnvironmentInfo() {
+            const isProduction = !window.location.hostname.includes('localhost');
+            document.getElementById('environment').textContent = isProduction ? 'Producción' : 'Desarrollo';
+            document.getElementById('deviceId').textContent = deviceId;
+        }
+        
+        function updateStatus(status, text) {
+            statusIndicator.className = `status-indicator ${status}`;
+            statusText.textContent = text;
+            lastSync.textContent = new Date().toLocaleTimeString();
+        }
+        
+        function logMessage(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const emoji = type === 'error' ? '❌' : type === 'warning' ? '⚠️' : type === 'success' ? '✅' : 'ℹ️';
+            const logEntry = `[${timestamp}] ${emoji} ${message}`;
+            
+            monitoringLogs.innerHTML += `<div>${logEntry}</div>`;
+            monitoringLogs.scrollTop = monitoringLogs.scrollHeight;
+        }
+        
+        async function testConnection() {
+            updateStatus('sincronizando', 'Probando conexión...');
+            try {
+                const response = await fetch(N8N_SPACES_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'get_spaces',
+                        timestamp: Date.now(),
+                        cache_buster: CACHE_BUSTER + '_' + Date.now(),
+                        source: 'test',
+                        device_id: deviceId
+                    })
+                });
+                
+                if (response.ok) {
+                    updateStatus('conectado', 'Conectado a N8N');
+                    logMessage('Conexión a N8N establecida correctamente', 'success');
+                    await testGetSpaces();
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                updateStatus('desconectado', 'Error de conexión');
+                logMessage(`Error de conexión: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testGetSpaces() {
+            updateStatus('sincronizando', 'Obteniendo espacios...');
+            try {
+                const response = await fetch(N8N_SPACES_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'get_spaces',
+                        timestamp: Date.now(),
+                        cache_buster: CACHE_BUSTER + '_' + Date.now(),
+                        source: 'test',
+                        device_id: deviceId
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    lastSpacesData = data;
+                    
+                    testResults.innerHTML = `✅ Espacios obtenidos exitosamente:
+                    
+Fechas disponibles: ${data.espacios ? Object.keys(data.espacios).length : 0}
+Timestamp: ${data.timestamp || 'N/A'}
+
+Datos completos:
+${JSON.stringify(data, null, 2)}`;
+                    
+                    // Actualizar cards
+                    if (data.espacios) {
+                        const total = Object.values(data.espacios).reduce((sum, spaces) => sum + spaces, 0);
+                        totalSpaces.textContent = total;
+                    }
+                    
+                    updateStatus('conectado', 'Espacios obtenidos');
+                    logMessage(`Espacios obtenidos: ${Object.keys(data.espacios || {}).length} fechas`, 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                testResults.innerHTML = `❌ Error al obtener espacios:
+
+${error.message}`;
+                testResults.className = 'result error';
+                updateStatus('desconectado', 'Error al obtener espacios');
+                logMessage(`Error al obtener espacios: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testSaveSpaces() {
+            if (!lastSpacesData) {
+                testResults.innerHTML = '⚠️ Primero debes obtener espacios para poder guardar';
+                testResults.className = 'result warning';
+                return;
+            }
+            
+            updateStatus('sincronizando', 'Guardando espacios...');
+            try {
+                // Crear datos de prueba modificados
+                const testSpaces = { ...lastSpacesData.espacios };
+                const firstDate = Object.keys(testSpaces)[0];
+                if (firstDate) {
+                    testSpaces[firstDate] = Math.max(0, testSpaces[firstDate] - 1);
+                }
+                
+                const response = await fetch(N8N_SPACES_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'save_spaces',
+                        espacios: testSpaces,
+                        timestamp: Date.now(),
+                        cache_buster: CACHE_BUSTER + '_' + Date.now(),
+                        source: 'test',
+                        device_id: deviceId
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    testResults.innerHTML = `✅ Espacios guardados exitosamente:
+                    
+Operación: save_spaces
+Timestamp: ${new Date().toISOString()}
+Fechas modificadas: ${Object.keys(testSpaces).length}
+
+Respuesta del servidor:
+${JSON.stringify(data, null, 2)}`;
+                    
+                    testResults.className = 'result';
+                    updateStatus('conectado', 'Espacios guardados');
+                    logMessage(`Espacios guardados: ${Object.keys(testSpaces).length} fechas`, 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                testResults.innerHTML = `❌ Error al guardar espacios:
+
+${error.message}`;
+                testResults.className = 'result error';
+                updateStatus('desconectado', 'Error al guardar espacios');
+                logMessage(`Error al guardar espacios: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testCreateReservation() {
+            updateStatus('sincronizando', 'Creando reserva...');
+            try {
+                const reservaTest = {
+                    id: `TEST_RESERVA_${Date.now()}`,
+                    fecha: '2025-07-16',
+                    name: 'Test Usuario',
+                    phone: '+34600000000',
+                    carBrand: 'Toyota',
+                    carModel: 'Corolla',
+                    carSize: 'medium',
+                    services: ['complete'],
+                    price: 25,
+                    timestamp: new Date().toISOString(),
+                    device_id: deviceId
+                };
+                
+                const response = await fetch(N8N_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'create_reservation',
+                        reserva: reservaTest,
+                        timestamp: Date.now(),
+                        cache_buster: CACHE_BUSTER + '_' + Date.now(),
+                        source: 'test'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    testResults.innerHTML = `✅ Reserva creada exitosamente:
+                    
+ID de Reserva: ${reservaTest.id}
+Fecha: ${reservaTest.fecha}
+Cliente: ${reservaTest.name}
+Vehículo: ${reservaTest.carBrand} ${reservaTest.carModel}
+Precio: ${reservaTest.price}€
+
+Respuesta del servidor:
+${JSON.stringify(data, null, 2)}`;
+                    
+                    testResults.className = 'result';
+                    updateStatus('conectado', 'Reserva creada');
+                    logMessage(`Reserva creada: ${reservaTest.id}`, 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                testResults.innerHTML = `❌ Error al crear reserva:
+
+${error.message}`;
+                testResults.className = 'result error';
+                updateStatus('desconectado', 'Error al crear reserva');
+                logMessage(`Error al crear reserva: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testSync() {
+            updateStatus('sincronizando', 'Sincronizando...');
+            logMessage('Iniciando sincronización manual', 'info');
+            
+            try {
+                await testGetSpaces();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                await testSaveSpaces();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                await testGetSpaces();
+                
+                logMessage('Sincronización completa exitosa', 'success');
+            } catch (error) {
+                logMessage(`Error en sincronización: ${error.message}`, 'error');
+            }
+        }
+        
+        function startMonitoring() {
+            if (isMonitoring) return;
+            
+            isMonitoring = true;
+            logMessage('Iniciando monitoreo en tiempo real', 'info');
+            
+            monitoringInterval = setInterval(async () => {
+                try {
+                    await testGetSpaces();
+                    connectedDevices.textContent = Math.floor(Math.random() * 5) + 1; // Simulado
+                } catch (error) {
+                    logMessage(`Error en monitoreo: ${error.message}`, 'error');
+                }
+            }, 5000);
+        }
+        
+        function stopMonitoring() {
+            if (!isMonitoring) return;
+            
+            isMonitoring = false;
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+                monitoringInterval = null;
+            }
+            
+            logMessage('Monitoreo detenido', 'info');
+        }
+        
+        function clearLogs() {
+            monitoringLogs.innerHTML = '<div>📝 Logs de monitoreo aparecerán aquí...</div>';
+        }
+        
+        function toggleAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                autoRefreshBtn.textContent = '⏰ Auto-Refresh';
+                autoRefreshBtn.classList.remove('active');
+                logMessage('Auto-refresh desactivado', 'info');
+            } else {
+                startAutoRefresh();
+                autoRefreshBtn.textContent = '⏰ Auto-Refresh (ON)';
+                autoRefreshBtn.classList.add('active');
+                logMessage('Auto-refresh activado', 'info');
+            }
+        }
+        
+        function startAutoRefresh() {
+            autoRefreshInterval = setInterval(async () => {
+                await testGetSpaces();
+            }, 10000);
+        }
+        
+        // Actualizar estado cada 30 segundos
+        setInterval(testConnection, 30000);
+    </script>
+</body>
+</html> 

@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+.env
+.nyc_output
+coverage
+.vscode
+*.log
+reservas_backup_*.json
+test-*.html
+my.ini
+install-mysql.bat 

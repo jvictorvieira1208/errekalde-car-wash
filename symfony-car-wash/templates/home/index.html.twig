@@ -1,0 +1,316 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Sistema de Reservas - Errekalde Car Wash{% endblock %}
+
+{% block body %}
+<div class="text-center mb-4">
+    <h1 class="display-4 fw-bold text-primary">
+        <i class="fas fa-car me-3"></i>
+        Errekalde Car Wash
+    </h1>
+    <p class="lead text-muted">Sistema de reservas con sincronización en tiempo real</p>
+    <div class="row text-center mt-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-calendar-check text-primary fa-2x mb-2"></i>
+                    <h5>Fechas Disponibles</h5>
+                    <span class="badge bg-primary fs-6" id="totalDates">{{ statistics.totalDates ?? 0 }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-parking text-success fa-2x mb-2"></i>
+                    <h5>Espacios Libres</h5>
+                    <span class="badge bg-success fs-6" id="availableSpaces">{{ statistics.availableSpaces ?? 0 }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <i class="fas fa-database text-info fa-2x mb-2"></i>
+                    <h5>Base de Datos</h5>
+                    <span class="badge bg-info fs-6">{{ system_info.database ?? 'MariaDB' }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Navegación por pasos -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-center align-items-center">
+            <button class="nav-step active" data-page="1">1</button>
+            <div class="border-top flex-grow-1 mx-2"></div>
+            <button class="nav-step" data-page="2">2</button>
+            <div class="border-top flex-grow-1 mx-2"></div>
+            <button class="nav-step" data-page="3">3</button>
+            <div class="border-top flex-grow-1 mx-2"></div>
+            <button class="nav-step" data-page="4">4</button>
+            <div class="border-top flex-grow-1 mx-2"></div>
+            <button class="nav-step" data-page="5">5</button>
+        </div>
+        <div class="d-flex justify-content-between mt-2 text-center small">
+            <span>Fecha</span>
+            <span>Datos</span>
+            <span>Verificación</span>
+            <span>Servicios</span>
+            <span>Confirmar</span>
+        </div>
+    </div>
+</div>
+
+<!-- Página 1: Selección de Fecha -->
+<div id="page-1" class="page active">
+    <div class="text-center">
+        <h2><i class="fas fa-calendar-alt me-2"></i>Selecciona tu Fecha</h2>
+        <p class="text-muted">Solo miércoles disponibles</p>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header text-center bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <button class="btn btn-outline-light btn-sm" id="prevMonth">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <h4 class="mb-0" id="currentMonth">Enero 2025</h4>
+                        <button class="btn btn-outline-light btn-sm" id="nextMonth">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center mb-2">
+                        <div class="col"><small>Lun</small></div>
+                        <div class="col"><small>Mar</small></div>
+                        <div class="col"><small>Mié</small></div>
+                        <div class="col"><small>Jue</small></div>
+                        <div class="col"><small>Vie</small></div>
+                        <div class="col"><small>Sáb</small></div>
+                        <div class="col"><small>Dom</small></div>
+                    </div>
+                    <div id="calendarDays"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-4">
+        <h5>Fecha seleccionada: <span id="selectedDate" class="text-primary">Ninguna</span></h5>
+        <p>Espacios disponibles: <span id="availableSpacesInfo" class="badge bg-success">0</span></p>
+        <button class="btn btn-primary" id="nextToPage2" disabled>
+            Continuar <i class="fas fa-arrow-right ms-2"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Página 2: Información Importante -->
+<div id="page-2" class="page">
+    <div class="text-center mb-4">
+        <h2><i class="fas fa-info-circle me-2"></i>Información Importante</h2>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 border-warning">
+                <div class="card-body text-center">
+                    <i class="fas fa-user-tie text-warning fa-3x mb-3"></i>
+                    <h5 class="card-title">Servicio Exclusivo</h5>
+                    <p class="card-text">Este servicio está disponible únicamente para trabajadores de <strong>SWAP ENERGIA</strong>.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 border-info">
+                <div class="card-body text-center">
+                    <i class="fas fa-key text-info fa-3x mb-3"></i>
+                    <h5 class="card-title">Entrega de Llaves</h5>
+                    <p class="card-text">Las llaves se entregarán entre las <strong>8:00 y las 9:00 de la mañana en el pabellón</strong>.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 border-danger">
+                <div class="card-body text-center">
+                    <i class="fas fa-euro-sign text-danger fa-3x mb-3"></i>
+                    <h5 class="card-title">Cargo por Suciedad</h5>
+                    <p class="card-text">Se cobrará <strong>10€ extra</strong> por exceso de suciedad en el vehículo.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center">
+        <button class="btn btn-outline-secondary me-2" id="prevToPage1">
+            <i class="fas fa-arrow-left me-2"></i>Anterior
+        </button>
+        <button class="btn btn-primary" id="nextToPage3">
+            Continuar <i class="fas fa-arrow-right ms-2"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Página 3: Datos Personales y Vehículo -->
+<div id="page-3" class="page">
+    <div class="text-center mb-4">
+        <h2><i class="fas fa-user-car me-2"></i>Datos Personales y Vehículo</h2>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-user me-2"></i>Datos de Contacto</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="clientName" class="form-label">Nombre completo:</label>
+                        <input type="text" class="form-control" id="clientName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">Número de teléfono:</label>
+                        <input type="tel" class="form-control" id="phone" placeholder="+34600000000" required>
+                        <button class="btn btn-outline-primary btn-sm mt-2" id="sendCode" disabled>
+                            <i class="fas fa-paper-plane me-2"></i>Enviar código de verificación
+                        </button>
+                    </div>
+                    
+                    <div id="verificationSection" style="display: none;">
+                        <div class="mb-3">
+                            <label for="verificationCode" class="form-label">Código de verificación:</label>
+                            <input type="text" class="form-control" id="verificationCode" maxlength="6" placeholder="123456">
+                            <div class="mt-2">
+                                <button class="btn btn-success btn-sm me-2" id="verifyCode">
+                                    <i class="fas fa-check me-2"></i>Verificar código
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" id="resendCode">
+                                    <i class="fas fa-redo me-2"></i>Reenviar código
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-car me-2"></i>Información del Vehículo</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="carBrand" class="form-label">Marca del vehículo:</label>
+                        <input type="text" class="form-control" id="carBrand" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="carModel" class="form-label">Modelo del vehículo:</label>
+                        <input type="text" class="form-control" id="carModel" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tamaño detectado:</label>
+                        <div class="alert alert-info" id="carSizeDetected">
+                            <i class="fas fa-search me-2"></i>
+                            <span id="carSizeText">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center">
+        <button class="btn btn-outline-secondary me-2" id="prevToPage2">
+            <i class="fas fa-arrow-left me-2"></i>Anterior
+        </button>
+        <button class="btn btn-primary" id="nextToPage4" disabled>
+            Continuar <i class="fas fa-arrow-right ms-2"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Página 4: Servicios y Precios -->
+<div id="page-4" class="page">
+    <div class="text-center mb-4">
+        <h2><i class="fas fa-soap me-2"></i>Servicios y Precios</h2>
+    </div>
+
+    <div id="servicesContainer">
+        <!-- Los servicios se cargan dinámicamente aquí -->
+    </div>
+
+    <div class="text-center">
+        <button class="btn btn-outline-secondary me-2" id="prevToPage3">
+            <i class="fas fa-arrow-left me-2"></i>Anterior
+        </button>
+        <button class="btn btn-primary" id="nextToPage5" disabled>
+            Continuar <i class="fas fa-arrow-right ms-2"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Página 5: Confirmar Reserva -->
+<div id="page-5" class="page">
+    <div class="text-center mb-4">
+        <h2><i class="fas fa-check-circle me-2"></i>Confirmar Reserva</h2>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div id="reservationSummary">
+                <!-- El resumen se genera dinámicamente aquí -->
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-4">
+        <button class="btn btn-outline-secondary me-2" id="prevToPage4">
+            <i class="fas fa-arrow-left me-2"></i>Anterior
+        </button>
+        <button class="btn btn-success btn-lg" id="confirmReservation">
+            <i class="fas fa-check me-2"></i>Confirmar Reserva
+        </button>
+    </div>
+</div>
+
+<!-- Página 6: Reserva Confirmada -->
+<div id="page-6" class="page">
+    <div class="text-center">
+        <div class="mb-4">
+            <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+        </div>
+        <h2 class="text-success">¡Reserva Confirmada!</h2>
+        <p class="lead">Tu reserva ha sido procesada correctamente. Recibirás una confirmación por WhatsApp.</p>
+        
+        <div id="finalSummary" class="mt-4">
+            <!-- El resumen final se genera aquí -->
+        </div>
+        
+        <button class="btn btn-primary btn-lg mt-4" id="newReservation">
+            <i class="fas fa-plus me-2"></i>Hacer Nueva Reserva
+        </button>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999;">
+    <div class="d-flex justify-content-center align-items-center h-100">
+        <div class="text-center text-white">
+            <div class="loading-spinner mb-3"></div>
+            <h5>Procesando reserva...</h5>
+            <p>Por favor, espera un momento</p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block javascripts %}
+<script src="{{ asset('js/car-wash-app.js') }}"></script>
+{% endblock %} 

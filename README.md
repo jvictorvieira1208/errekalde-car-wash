@@ -1,184 +1,196 @@
-# Errekalde Car Wash - Sistema de Sincronización Global
+# 🚗 Errekalde Car Wash - Sistema de Reservas
 
-## Descripción
-Sistema de reservas para lavado de coches exclusivo para trabajadores de SWAP ENERGIA con sincronización global de espacios disponibles en tiempo real.
+Sistema completo de reservas con sincronización global en tiempo real usando base de datos MySQL/PostgreSQL.
 
-## Características Principales
+## 🌐 **URLs del Sistema**
 
-### 🗓️ Calendario Inteligente
-- Solo permite seleccionar **miércoles**
-- Muestra espacios disponibles en tiempo real (8/8, 7/8, etc.)
-- Sincronización automática cada 5 segundos entre todos los dispositivos
-- Días sin espacios disponibles se muestran en rojo y están deshabilitados
-
-### 🔄 Sincronización Global MEJORADA
-- **Backend Node.js** en puerto 3001
-- **Base de datos JSON** centralizada (`reservas.json`)
-- **API REST** para gestión de reservas y espacios
-- **Actualización automática** cada 5 segundos
-- **Sincronización en tiempo real** entre todos los dispositivos
-- **Indicadores visuales** de estado de sincronización
-- **Notificaciones automáticas** de cambios en tiempo real
-- **Recuperación automática** ante pérdida de conexión
-- **Animaciones inteligentes** cuando cambian los espacios
-- **Sincronización inmediata** después de reservas
-
-### 📱 Verificación WhatsApp
-- Códigos de verificación enviados por WhatsApp via n8n
-- Verificación de números de teléfono
-- Confirmación de reservas automática
-
-### 🚗 Detección Automática de Vehículos
-- Base de datos de 200+ marcas y 5000+ modelos
-- Clasificación automática por tamaño (pequeño/mediano/grande)
-- Precios dinámicos según tamaño detectado
-
-## Instalación y Uso
-
-### Opción 1: Inicio Automático (Recomendado)
-```bash
-# Ejecutar el script de inicio automático
-iniciar-sistema.bat
+### **Frontend (Público)**
+```
+https://errekalde-car-wash.surge.sh
 ```
 
-### Opción 2: Inicio Manual
+### **Backend (Base de Datos Centralizada)**
+- **N8N Universal**: `https://n8nserver.swapenergia.com/webhook/`
+- **Local (Desarrollo)**: `http://localhost:3001`
+
+### **Endpoints N8N (Producción)**
+- **Espacios**: `https://n8nserver.swapenergia.com/webhook/errekaldecarwash-spaces`
+- **Reservas**: `https://n8nserver.swapenergia.com/webhook/errekaldecarwash`
+- **Verificación**: `https://n8nserver.swapenergia.com/webhook/validarNúmero`
+
+## 🎯 **Características**
+
+- ✅ **Base de Datos Centralizada Universal** con N8N
+- ✅ **Sincronización Global** en tiempo real (3-5 segundos)
+- ✅ **Una sola fuente de verdad** - todos los dispositivos conectados
+- ✅ **Concurrencia real** - múltiples usuarios simultáneos
+- ✅ **Detección automática** de entorno (local/producción)
+- ✅ **Responsive** - funciona en móviles, tablets y desktop
+- ✅ **Indicadores de estado** - 🟢🟡🔴 para sincronización
+
+## 🏗️ **Arquitectura**
+
+### **Frontend**
+- HTML5, CSS3, JavaScript vanilla
+- Responsive design con animaciones
+- Detección automática de entorno (local/producción)
+- Sincronización automática cada 3 segundos
+- Indicadores visuales de estado de conexión
+
+### **Backend Centralizado**
+- **N8N Universal**: Base de datos centralizada para producción
+- **Node.js + Express**: Servidor local para desarrollo
+- **Webhooks**: Endpoints para espacios, reservas y verificación
+- **Variables globales**: Almacenamiento persistente en N8N
+
+### **Base de Datos**
+- **Producción**: N8N (Variables globales persistentes)
+- **Local**: MySQL/MariaDB (XAMPP)
+- **Sincronización**: Tiempo real entre todos los dispositivos
+- **Concurrencia**: Manejo de múltiples usuarios simultáneos
+
+## 🚀 **Instalación Local**
+
+### **Prerequisitos**
+- Node.js 18+
+- XAMPP (con MariaDB)
+- Git
+
+### **Configuración**
 ```bash
-# 1. Instalar dependencias
+# 1. Clonar repositorio
+git clone [URL-DEL-REPO]
+cd errekalde-car-wash
+
+# 2. Instalar dependencias
 npm install
 
-# 2. Iniciar servidor backend
-node server.js
+# 3. Iniciar XAMPP y MariaDB
+C:\xampp\xampp-control.exe
 
-# 3. En otra terminal, iniciar frontend
-npx http-server -p 8080 -o
+# 4. Crear base de datos
+C:\xampp\mysql\bin\mysql.exe -u root -e "CREATE DATABASE errekalde_car_wash"
+Get-Content schema.sql | C:\xampp\mysql\bin\mysql.exe -u root errekalde_car_wash
+
+# 5. Migrar datos existentes (opcional)
+node migrate.js
+
+# 6. Iniciar servidor
+npm run dev
 ```
 
-## Estructura del Sistema
-
-### Backend (Puerto 3001)
-- `server.js` - Servidor Express con API REST
-- `reservas.json` - Base de datos de reservas y espacios
-- Endpoints:
-  - `GET /api/sync-espacios` - Sincronización global
-  - `GET /api/espacios/:fecha` - Espacios para fecha específica
-  - `POST /api/reservar` - Crear nueva reserva
-  - `DELETE /api/reservar/:id` - Cancelar reserva
-  - `POST /api/inicializar-espacios` - Inicializar espacios
-
-### Frontend (Puerto 8080)
-- `index.html` - Interfaz principal
-- `script.js` - Lógica de sincronización y UI
-- `styles.css` - Estilos profesionales
-
-## API Endpoints
-
-### Sincronización Global
-```javascript
-// Obtener todos los espacios disponibles
-GET /api/sync-espacios
-Response: { espacios: {...}, timestamp: "..." }
-
-// Obtener espacios para fecha específica
-GET /api/espacios/2024-01-15
-Response: { fecha: "2024-01-15", espacios: 6 }
-```
-
-### Gestión de Reservas
-```javascript
-// Crear nueva reserva
-POST /api/reservar
-Body: { fecha: "2024-01-15", name: "...", ... }
-Response: { success: true, reserva: {...}, espaciosDisponibles: 5 }
-
-// Cancelar reserva
-DELETE /api/reservar/123456
-Response: { success: true, espaciosDisponibles: 6 }
-```
-
-## Funcionamiento de Sincronización MEJORADO
-
-### 🔄 Sincronización Básica
-1. **Inicialización**: Al cargar la página, se inicializan 8 espacios para los próximos 12 miércoles
-2. **Sincronización Automática**: Cada 5 segundos se consulta el servidor para obtener espacios actualizados
-3. **Reserva en Tiempo Real**: Al confirmar una reserva, se reduce inmediatamente el contador global
-4. **Visualización Dinámica**: El calendario se actualiza automáticamente mostrando espacios disponibles
-5. **Prevención de Conflictos**: El servidor verifica disponibilidad antes de confirmar reservas
-
-### ✨ Nuevas Funcionalidades de Sincronización
-1. **Indicador Visual de Estado**: 
-   - 🟢 Verde: Sincronizado correctamente
-   - 🔵 Azul: Sincronizando datos
-   - 🔴 Rojo: Sin conexión
-   
-2. **Notificaciones Inteligentes**:
-   - Notifica cuando alguien más hace una reserva
-   - Muestra cambios en espacios disponibles
-   - Alerta sobre problemas de conexión
-   
-3. **Sincronización Adaptativa**:
-   - Sincronización inmediata después de reservas
-   - Sincronización al volver a la página activa
-   - Recuperación automática de conexión
-   
-4. **Animaciones en Tiempo Real**:
-   - Los números de espacios se animan al cambiar
-   - Los días del calendario "saltan" cuando se actualizan
-   - Efectos visuales para cambios importantes
-   
-5. **Robustez de Conexión**:
-   - Detecta pérdida de conexión a internet
-   - Reintenta automáticamente cada 10 segundos
-   - Funciona sin conexión mostrando último estado conocido
-
-## Características Técnicas
-
-- **Sincronización**: Polling cada 5 segundos
-- **Base de Datos**: JSON con persistencia en disco
-- **API**: RESTful con CORS habilitado
-- **Frontend**: Vanilla JavaScript con CSS moderno
-- **Responsive**: Diseño adaptativo para móviles y desktop
-
-## Monitoreo
-
-### Logs del Servidor
+### **Verificación**
 ```bash
-# Ver logs en tiempo real
-tail -f server.log
+# Health check
+curl http://localhost:3001/api/health
+
+# Espacios disponibles
+curl http://localhost:3001/api/espacios
 ```
 
-### Estado de Espacios
+## 🌍 **Despliegue en Producción**
+
+Ver guía completa en [`README-RENDER.md`](./README-RENDER.md)
+
+### **Resumen rápido**
+1. Subir código a GitHub
+2. Crear cuenta en Render.com
+3. Desplegar PostgreSQL (gratuito)
+4. Desplegar aplicación web
+5. Ejecutar schema PostgreSQL
+6. Actualizar URL en frontend
+
+## 📊 **API Endpoints**
+
+### **Público**
+- `GET /api/health` - Estado del sistema
+- `GET /api/espacios` - Espacios disponibles
+- `GET /api/sync-espacios` - Sincronización global
+- `POST /api/reservar` - Crear reserva
+
+### **Administración**
+- `GET /api/estadisticas` - Estadísticas del sistema
+- `POST /api/inicializar-espacios` - Inicializar fechas
+
+## 🗄️ **Base de Datos**
+
+### **Tablas**
+- `espacios_disponibles` - Control de espacios por fecha
+- `reservas` - Información completa de reservas
+- `servicios` - Catálogo de servicios
+- `reserva_servicios` - Relación M:N reservas-servicios
+- `espacios_audit` - Auditoría de cambios
+
+### **Funcionalidades**
+- Constraints y validaciones
+- Índices optimizados
+- Triggers automáticos (PostgreSQL)
+- Foreign keys con CASCADE
+
+## 🔧 **Scripts Disponibles**
+
 ```bash
-# Consultar espacios disponibles
-curl http://localhost:3001/api/sync-espacios
+npm start          # Servidor universal (Render)
+npm run dev        # Servidor local (MySQL)
+npm run migrate    # Migrar datos JSON → BD
 ```
 
-## Troubleshooting
+## 🆘 **Troubleshooting**
 
-### Problemas de Sincronización
-1. Verificar que el servidor esté corriendo en puerto 3001
-2. Comprobar conectividad de red
-3. Revisar logs del servidor
+### **Problemas comunes**
+1. **XAMPP no inicia**: Verificar puertos 80 y 3306
+2. **Error de conexión BD**: Revisar credenciales en `config.js`
+3. **Migración falla**: Verificar que las tablas existan
 
-### Problemas de Reservas
-1. Verificar disponibilidad de espacios
-2. Comprobar formato de fecha (YYYY-MM-DD)
-3. Revisar datos de reserva completos
+### **Logs**
+- Aplicación: Console del navegador
+- Servidor: Terminal donde se ejecuta Node.js
+- Base de datos: Logs de MySQL/PostgreSQL
 
-## Despliegue
+## 📱 **Compatibilidad**
 
-### Local
-- Backend: `http://localhost:3001`
-- Frontend: `http://localhost:8080`
+### **Navegadores**
+- Chrome 80+
+- Firefox 75+
+- Safari 13+
+- Edge 80+
 
-### Producción
-- Configurar variables de entorno
-- Usar PM2 para gestión de procesos
-- Configurar proxy reverso (nginx)
-- Implementar SSL/TLS
+### **Dispositivos**
+- Desktop (1200px+)
+- Tablet (768px - 1199px)
+- Mobile (320px - 767px)
 
-## Soporte
+## 🔄 **Sincronización**
 
-Para soporte técnico, contactar al equipo de desarrollo de SWAP ENERGIA.
+### **Modos de Operación**
+1. **Online + Backend**: Sincronización real en base de datos
+2. **Online sin Backend**: localStorage con webhooks N8N
+3. **Offline**: Solo localStorage local
+
+### **Detección Automática**
+El sistema detecta automáticamente el entorno y ajusta el comportamiento:
+- `localhost` → Conecta a backend local
+- `errekalde-car-wash.surge.sh` → Modo producción
+
+## 📈 **Futuras Mejoras**
+- [ ] Panel de administración web
+- [ ] Notificaciones push
+- [ ] Integración WhatsApp Business
+- [ ] Reportes y analytics
+- [ ] Sistema de descuentos
+
+## 👥 **Contribución**
+
+1. Fork del repositorio
+2. Crear rama feature (`git checkout -b feature/nueva-funcionalidad`)
+3. Commit cambios (`git commit -m 'Agregar nueva funcionalidad'`)
+4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
+5. Crear Pull Request
+
+## 📄 **Licencia**
+
+Este proyecto es propiedad de SWAP ENERGÍA - Errekalde Car Wash.
 
 ---
-**Desarrollado para SWAP ENERGIA** 🚗✨ 
+
+**Desarrollado con ❤️ para Errekalde Car Wash** 

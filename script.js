@@ -49,15 +49,17 @@ const VEHICLE_DATABASE = {
 // Configuración de n8n
 const N8N_WEBHOOK_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
 const N8N_VALIDATION_URL = 'https://n8nserver.swapenergia.com/webhook/validarNúmero';
+const N8N_SYNC_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash-sync';
+const N8N_SPACES_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash-spaces';
 
-// Detección automática de entorno
+// Detección automática de entorno - SIEMPRE usar sincronización N8N
 function getServerUrl() {
-    // Si estamos en localhost del desarrollador, usar servidor local
+    // Para desarrollo local, usar servidor local como fallback
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         return 'http://localhost:3001';
     }
-    // En producción, usar funcionalidad local (sin servidor backend)
-    return null; // Indica que no hay servidor backend disponible
+    // Para producción, usar N8N directamente
+    return null;
 }
 
 // Variables globales
@@ -85,6 +87,9 @@ let reservationData = {
 // Configuración del servidor con detección automática
 const SERVER_URL = getServerUrl();
 const IS_PRODUCTION = !window.location.hostname.includes('localhost');
+
+// Cache buster para forzar actualizaciones
+const CACHE_BUSTER = 'REALTIMESYNC2024';
 
 // Elementos del DOM
 const pages = document.querySelectorAll('.page');
@@ -126,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateNavigation();
     
     // Inicializar sistema de sincronización
-    inicializarSincronizacion();
+    inicializarSincronizacionAutomatica();
     inicializarEspaciosEnServidor();
 });
 
@@ -1161,130 +1166,362 @@ function getNotificationIcon(type) {
     return icons[type] || 'fa-info-circle';
 }
 
-// ===== SISTEMA DE SINCRONIZACIÓN GLOBAL MEJORADO =====
+// ===== SISTEMA DE SINCRONIZACIÓN VERDADERA CON N8N =====
 
-// Función para sincronizar espacios disponibles con indicadores visuales
+// Variables para sincronización agresiva
+let syncInterval = null;
+let lastSpacesHash = '';
+let isReservationInProgress = false;
+
+// Función principal para sincronizar espacios usando N8N como backend universal
 async function sincronizarEspaciosGlobal() {
+    if (isReservationInProgress) {
+        console.log('⏸️ Reserva en progreso, saltando sincronización');
+        return;
+    }
+
     try {
-        // Actualizar estado a sincronizando
+        console.log('🔄 Iniciando sincronización verdadera...');
         updateSyncStatus('sincronizando');
         
-        if (SERVER_URL) {
-            // Modo desarrollo con servidor backend
-            const response = await fetch(`${SERVER_URL}/api/sync-espacios`);
-            if (response.ok) {
-                const data = await response.json();
+        // PASO 1: Obtener datos SIEMPRE desde N8N (sin localStorage)
+        const espaciosN8N = await obtenerEspaciosDesdeN8N();
+        
+        if (espaciosN8N) {
+            console.log('✅ Datos obtenidos desde N8N:', Object.keys(espaciosN8N).length, 'fechas');
+            
+            // PASO 2: Calcular hash para detectar cambios reales
+            const newHash = JSON.stringify(espaciosN8N);
+            const hasChanges = newHash !== lastSpacesHash;
+            
+            if (hasChanges) {
+                console.log('🔄 Cambios detectados desde otros dispositivos');
                 const espaciosAnteriores = { ...espaciosGlobales };
-                espaciosGlobales = data.espacios;
-                lastSyncTime = new Date();
+                espaciosGlobales = espaciosN8N;
                 
-                // Detectar cambios y notificar
+                // PASO 3: Detectar y notificar cambios específicos
                 detectarCambiosEspacios(espaciosAnteriores, espaciosGlobales);
                 
-                // Actualizar espacios en el calendario si hay una fecha seleccionada
-                if (selectedDate) {
-                    const fechaStr = selectedDate.toISOString().split('T')[0];
-                    const espaciosDisponibles = espaciosGlobales[fechaStr] || 8;
-                    const espaciosAnteriores = availableSpaces;
-                    availableSpaces = espaciosDisponibles;
-                    
-                    if (availableSpacesElement) {
-                        availableSpacesElement.textContent = espaciosDisponibles;
-                        
-                        // Animar si hay cambios
-                        if (espaciosAnteriores !== espaciosDisponibles) {
-                            availableSpacesElement.style.animation = 'none';
-                            void availableSpacesElement.offsetWidth;
-                            availableSpacesElement.style.animation = 'pulse 0.5s ease-in-out';
-                        }
-                    }
-                }
+                // PASO 4: Actualizar interfaz inmediatamente
+                actualizarInterfazConEspacios();
                 
-                // Actualizar visualización del calendario
-                actualizarCalendarioConEspacios();
+                // PASO 5: Actualizar hash
+                lastSpacesHash = newHash;
                 
-                // Estado exitoso
-                updateSyncStatus('conectado');
-                
+                console.log('✅ Interfaz actualizada con cambios de otros dispositivos');
             } else {
-                throw new Error(`Error HTTP: ${response.status}`);
-            }
-        } else {
-            // Modo producción - usar localStorage para simular sincronización
-            const espaciosAnteriores = { ...espaciosGlobales };
-            
-            // Cargar espacios desde localStorage
-            const espaciosGuardados = localStorage.getItem('espaciosGlobales');
-            if (espaciosGuardados) {
-                espaciosGlobales = JSON.parse(espaciosGuardados);
-            } else {
-                // Inicializar espacios por defecto si no existen
-                espaciosGlobales = inicializarEspaciosPorDefecto();
-                localStorage.setItem('espaciosGlobales', JSON.stringify(espaciosGlobales));
+                console.log('ℹ️ Sin cambios desde la última sincronización');
+                espaciosGlobales = espaciosN8N;
             }
             
             lastSyncTime = new Date();
-            
-            // Detectar cambios
-            detectarCambiosEspacios(espaciosAnteriores, espaciosGlobales);
-            
-            // Actualizar espacios en el calendario si hay una fecha seleccionada
-            if (selectedDate) {
-                const fechaStr = selectedDate.toISOString().split('T')[0];
-                const espaciosDisponibles = espaciosGlobales[fechaStr] || 8;
-                const espaciosAnteriores = availableSpaces;
-                availableSpaces = espaciosDisponibles;
-                
-                if (availableSpacesElement) {
-                    availableSpacesElement.textContent = espaciosDisponibles;
-                }
-            }
-            
-            // Actualizar visualización del calendario
-            actualizarCalendarioConEspacios();
-            
-            // Estado exitoso
             updateSyncStatus('conectado');
+            
+        } else {
+            throw new Error('No se pudieron obtener datos de N8N');
         }
         
     } catch (error) {
-        console.error('Error en sincronización:', error);
+        console.error('❌ Error en sincronización:', error);
         updateSyncStatus('desconectado');
         
-        // En producción, si hay error usar datos locales como fallback
-        if (!SERVER_URL) {
-            const espaciosLocal = localStorage.getItem('espaciosGlobales');
-            if (espaciosLocal) {
-                espaciosGlobales = JSON.parse(espaciosLocal);
-                updateSyncStatus('conectado');
-            }
-        } else {
-            // Reintentar después de 10 segundos si hay error en desarrollo
-            setTimeout(() => {
-                console.log('🔄 Reintentando sincronización...');
-                sincronizarEspaciosGlobal();
-            }, 10000);
+        // FALLBACK: Usar datos actuales sin localStorage
+        if (Object.keys(espaciosGlobales).length === 0) {
+            console.log('🆕 Inicializando espacios por defecto');
+            espaciosGlobales = inicializarEspaciosPorDefecto();
+            await guardarEspaciosEnN8N(espaciosGlobales);
         }
+        
+        // Reintentar más agresivamente si hay error
+        setTimeout(() => {
+            console.log('🔄 Reintentando sincronización...');
+            sincronizarEspaciosGlobal();
+        }, 5000);
     }
 }
 
-// Función para detectar cambios en espacios (sin notificaciones)
+// Función para obtener espacios desde N8N (backend centralizado)
+async function obtenerEspaciosDesdeN8N() {
+    try {
+        console.log('📡 Consultando espacios en N8N...');
+        
+        const payload = {
+            action: 'get_spaces',
+            timestamp: Date.now(),
+            cache_buster: CACHE_BUSTER + '_' + Date.now(),
+            source: IS_PRODUCTION ? 'mobile' : 'desktop',
+            device_id: generateDeviceId()
+        };
+        
+        const response = await fetch(N8N_SPACES_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Si N8N devuelve datos válidos, usarlos
+            if (data && data.espacios && typeof data.espacios === 'object') {
+                console.log('✅ Espacios obtenidos de N8N:', Object.keys(data.espacios).length);
+                return data.espacios;
+            }
+            
+            // Si N8N no tiene datos, inicializar con espacios por defecto
+            console.log('⚠️ N8N sin datos, inicializando espacios...');
+            const espaciosIniciales = inicializarEspaciosPorDefecto();
+            await guardarEspaciosEnN8N(espaciosIniciales);
+            return espaciosIniciales;
+            
+        } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error obteniendo espacios de N8N:', error);
+        return null;
+    }
+}
+
+// Función para guardar espacios en N8N (backend centralizado)
+async function guardarEspaciosEnN8N(espacios) {
+    try {
+        console.log('💾 Guardando espacios en N8N...', Object.keys(espacios).length, 'fechas');
+        
+        const payload = {
+            action: 'save_spaces',
+            espacios: espacios,
+            timestamp: Date.now(),
+            cache_buster: CACHE_BUSTER + '_' + Date.now(),
+            source: IS_PRODUCTION ? 'mobile' : 'desktop',
+            device_id: generateDeviceId()
+        };
+        
+        const response = await fetch(N8N_SPACES_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (response.ok) {
+            console.log('✅ Espacios guardados en N8N exitosamente');
+            return true;
+        } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error guardando espacios en N8N:', error);
+        return false;
+    }
+}
+
+// Función CRÍTICA: hacer reserva con sincronización inmediata
+async function hacerReservaEnServidor(reservaData) {
+    isReservationInProgress = true;
+    
+    try {
+        console.log('🎯 Haciendo reserva con sincronización inmediata...');
+        
+        // PASO 1: Sincronizar datos ANTES de reservar
+        updateSyncStatus('sincronizando');
+        await sincronizarEspaciosGlobal();
+        
+        // PASO 2: Verificar disponibilidad en tiempo real
+        const fechaStr = reservaData.fecha;
+        const espaciosDisponibles = espaciosGlobales[fechaStr] || 8;
+        
+        if (espaciosDisponibles <= 0) {
+            throw new Error('No hay espacios disponibles para esta fecha');
+        }
+        
+        // PASO 3: Actualizar espacios INMEDIATAMENTE en N8N
+        const nuevosEspacios = { ...espaciosGlobales };
+        nuevosEspacios[fechaStr] = espaciosDisponibles - 1;
+        
+        // PASO 4: Guardar en N8N ANTES de continuar
+        const guardadoExitoso = await guardarEspaciosEnN8N(nuevosEspacios);
+        
+        if (!guardadoExitoso) {
+            throw new Error('Error al actualizar espacios en el servidor');
+        }
+        
+        // PASO 5: Actualizar datos locales
+        espaciosGlobales[fechaStr] = espaciosDisponibles - 1;
+        lastSpacesHash = JSON.stringify(espaciosGlobales);
+        
+        // PASO 6: Crear la reserva en N8N
+        const reservaCompleta = {
+            ...reservaData,
+            id: `RESERVA-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            espacios_antes: espaciosDisponibles,
+            espacios_despues: espaciosDisponibles - 1,
+            device_id: generateDeviceId()
+        };
+        
+        const resultadoReserva = await crearReservaEnN8N(reservaCompleta);
+        
+        if (resultadoReserva.success) {
+            // PASO 7: Actualizar interfaz inmediatamente
+            actualizarInterfazConEspacios();
+            
+            // PASO 8: Forzar sincronización inmediata para otros dispositivos
+            setTimeout(() => {
+                console.log('📢 Forzando sincronización global después de reserva');
+                sincronizarEspaciosGlobal();
+            }, 1000);
+            
+            console.log('✅ Reserva completada y sincronizada globalmente');
+            updateSyncStatus('conectado');
+            
+            return resultadoReserva;
+            
+        } else {
+            throw new Error(resultadoReserva.error || 'Error al crear la reserva');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en reserva:', error);
+        updateSyncStatus('desconectado');
+        throw error;
+    } finally {
+        isReservationInProgress = false;
+    }
+}
+
+// Función para crear reserva en N8N
+async function crearReservaEnN8N(reservaData) {
+    try {
+        console.log('📝 Creando reserva en N8N...');
+        
+        const payload = {
+            action: 'create_reservation',
+            reserva: reservaData,
+            timestamp: Date.now(),
+            cache_buster: CACHE_BUSTER + '_' + Date.now(),
+            source: IS_PRODUCTION ? 'mobile' : 'desktop'
+        };
+        
+        const response = await fetch(N8N_WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (response.ok) {
+            console.log('✅ Reserva creada en N8N');
+            return { success: true };
+        } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error creando reserva en N8N:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// Generar ID único del dispositivo
+function generateDeviceId() {
+    let deviceId = localStorage.getItem('device_id');
+    if (!deviceId) {
+        deviceId = 'DEV_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('device_id', deviceId);
+    }
+    return deviceId;
+}
+
+// Función para actualizar la interfaz con los espacios
+function actualizarInterfazConEspacios() {
+    // Actualizar espacios en el calendario si hay una fecha seleccionada
+    if (selectedDate) {
+        const fechaStr = selectedDate.toISOString().split('T')[0];
+        const espaciosDisponibles = espaciosGlobales[fechaStr] || 8;
+        const espaciosAnteriores = availableSpaces;
+        availableSpaces = espaciosDisponibles;
+        
+        if (availableSpacesElement) {
+            availableSpacesElement.textContent = espaciosDisponibles;
+            
+            // Animar si hay cambios
+            if (espaciosAnteriores !== espaciosDisponibles) {
+                availableSpacesElement.style.animation = 'none';
+                void availableSpacesElement.offsetWidth;
+                availableSpacesElement.style.animation = 'pulse 0.5s ease-in-out';
+                
+                // Mostrar notificación de cambio
+                if (espaciosAnteriores > espaciosDisponibles) {
+                    showNotification(`📉 Espacio reservado: ${espaciosDisponibles} disponibles`, 'info');
+                } else if (espaciosAnteriores < espaciosDisponibles) {
+                    showNotification(`📈 Espacio liberado: ${espaciosDisponibles} disponibles`, 'success');
+                }
+            }
+        }
+    }
+    
+    // Actualizar visualización del calendario
+    actualizarCalendarioConEspacios();
+}
+
+// Función para detectar cambios en espacios
 function detectarCambiosEspacios(espaciosAnteriores, espaciosNuevos) {
-    // Solo detectar cambios internamente, sin mostrar notificaciones
+    let cambiosDetectados = 0;
+    
     for (const fecha in espaciosNuevos) {
         const espaciosAntes = espaciosAnteriores[fecha];
         const espaciosAhora = espaciosNuevos[fecha];
         
         if (espaciosAntes !== undefined && espaciosAntes !== espaciosAhora) {
-            console.log(`Cambio detectado en ${fecha}: ${espaciosAntes} → ${espaciosAhora}`);
+            console.log(`🔄 Cambio detectado en ${fecha}: ${espaciosAntes} → ${espaciosAhora}`);
+            cambiosDetectados++;
         }
+    }
+    
+    if (cambiosDetectados > 0) {
+        console.log(`✨ ${cambiosDetectados} cambios sincronizados desde otros dispositivos`);
+        showNotification(`🔄 ${cambiosDetectados} cambios sincronizados`, 'info');
     }
 }
 
-// Función para actualizar estado de sincronización (sin indicadores visuales)
+// Función para actualizar estado de sincronización
 function updateSyncStatus(status) {
     syncStatus = status;
-    // Solo mantener el estado interno, sin mostrar indicadores visuales
+    
+    // Actualizar indicador visual si existe
+    const syncIndicator = document.getElementById('sync-status');
+    if (syncIndicator) {
+        syncIndicator.className = `sync-status ${status}`;
+        
+        const statusText = {
+            'conectado': '🟢 Sincronizado',
+            'desconectado': '🔴 Desconectado', 
+            'sincronizando': '🟡 Sincronizando...'
+        }[status] || '⚪ Desconocido';
+        
+        syncIndicator.textContent = statusText;
+        
+        // Añadir timestamp
+        if (status === 'conectado' && lastSyncTime) {
+            const timeStr = lastSyncTime.toLocaleTimeString();
+            syncIndicator.title = `Última sincronización: ${timeStr}`;
+        }
+    }
+    
+    console.log(`📡 Estado de sincronización: ${status}`);
 }
 
 // Función para actualizar el calendario con espacios disponibles y animaciones
@@ -1349,131 +1586,42 @@ function inicializarEspaciosPorDefecto() {
         espacios[fechaStr] = 8; // 8 espacios disponibles por defecto
     }
     
-    console.log('📅 Espacios inicializados para producción:', Object.keys(espacios));
+    console.log('📅 Espacios inicializados:', Object.keys(espacios).length, 'fechas');
     return espacios;
 }
 
-// Función mejorada para hacer una reserva en el servidor
-async function hacerReservaEnServidor(reservaData) {
-    try {
-        // Sincronización rápida antes de reservar
-        updateSyncStatus('sincronizando');
-        
-        if (SERVER_URL) {
-            // Modo desarrollo con servidor backend
-            const response = await fetch(`${SERVER_URL}/api/reservar`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(reservaData)
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                
-                // Sincronización inmediata después de reserva exitosa
-                await sincronizarEspaciosGlobal();
-                
-                // Sincronización adicional después de 2 segundos para asegurar propagación
-                setTimeout(sincronizarEspaciosGlobal, 2000);
-                
-                console.log('✅ Reserva confirmada y sincronizada globalmente');
-                return result;
-            } else {
-                const error = await response.json();
-                throw new Error(error.error || 'Error al hacer la reserva');
-            }
-        } else {
-            // Modo producción - gestionar reserva localmente
-            const fechaStr = reservaData.fecha;
-            
-            // Verificar espacios disponibles
-            const espaciosActuales = espaciosGlobales[fechaStr] || 8;
-            if (espaciosActuales <= 0) {
-                throw new Error('No hay espacios disponibles para esta fecha');
-            }
-            
-            // Reducir espacios disponibles
-            espaciosGlobales[fechaStr] = espaciosActuales - 1;
-            
-            // Guardar en localStorage
-            localStorage.setItem('espaciosGlobales', JSON.stringify(espaciosGlobales));
-            
-            // Crear objeto de respuesta similar al servidor
-            const result = {
-                success: true,
-                reserva: {
-                    id: Date.now().toString(),
-                    fecha: fechaStr,
-                    ...reservaData,
-                    timestamp: new Date().toISOString()
-                },
-                espaciosDisponibles: espaciosGlobales[fechaStr]
-            };
-            
-            // Guardar reserva en localStorage también
-            const reservasLocales = JSON.parse(localStorage.getItem('reservasLocales') || '[]');
-            reservasLocales.push(result.reserva);
-            localStorage.setItem('reservasLocales', JSON.stringify(reservasLocales));
-            
-            // Sincronización inmediata después de reserva
-            await sincronizarEspaciosGlobal();
-            
-            console.log('✅ Reserva confirmada y guardada localmente');
-            return result;
-        }
-        
-    } catch (error) {
-        updateSyncStatus('desconectado');
-        throw error;
-    }
-}
-
-// Función para obtener espacios disponibles para una fecha específica
-async function obtenerEspaciosDisponibles(fecha) {
-    try {
-        const fechaStr = fecha.toISOString().split('T')[0];
-        const response = await fetch(`${SERVER_URL}/api/espacios/${fechaStr}`);
-        if (response.ok) {
-            const data = await response.json();
-            return data.espacios;
-        }
-    } catch (error) {
-        console.error('Error obteniendo espacios:', error);
-    }
-    return 8; // Valor por defecto
-}
-
-// Inicializar sincronización automática mejorada
-function inicializarSincronizacion() {
-    console.log('🔄 Iniciando sistema de sincronización global mejorado...');
+// Inicializar sincronización AGRESIVA para tiempo real
+function inicializarSincronizacionAutomatica() {
+    console.log('🔄 Iniciando sincronización AGRESIVA en tiempo real...');
     
-    // Sincronizar al cargar la página
+    // Sincronización inicial inmediata
     sincronizarEspaciosGlobal();
     
-    // Sincronización regular cada 5 segundos
-    setInterval(sincronizarEspaciosGlobal, 5000);
+    // Limpiar interval anterior si existe
+    if (syncInterval) {
+        clearInterval(syncInterval);
+    }
     
-    // Sincronización cuando la página vuelve a tener foco
-    document.addEventListener('visibilitychange', function() {
+    // Sincronización automática cada 3 segundos (muy agresiva)
+    syncInterval = setInterval(async () => {
+        await sincronizarEspaciosGlobal();
+    }, 3000);
+    
+    // Sincronización cuando la ventana recibe foco
+    window.addEventListener('focus', () => {
+        console.log('🔄 Ventana con foco, sincronizando...');
+        setTimeout(sincronizarEspaciosGlobal, 500);
+    });
+    
+    // Sincronización cuando la página se vuelve visible
+    document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
-            console.log('🔄 Página activa - Sincronización inmediata');
-            sincronizarEspaciosGlobal();
+            console.log('🔄 Página visible, sincronizando...');
+            setTimeout(sincronizarEspaciosGlobal, 500);
         }
     });
     
-    // Sincronización cuando se restaura la conexión
-    window.addEventListener('online', function() {
-        console.log('🌐 Conexión restaurada - Sincronización inmediata');
-        sincronizarEspaciosGlobal();
-    });
-    
-    // Detectar pérdida de conexión
-    window.addEventListener('offline', function() {
-        console.log('❌ Conexión perdida');
-        updateSyncStatus('desconectado');
-    });
+    console.log('✅ Sincronización AGRESIVA configurada (cada 3 segundos)');
 }
 
 // Inicializar espacios en el servidor
@@ -1512,6 +1660,20 @@ async function inicializarEspaciosEnServidor() {
 
 // LIMPIEZA CONSERVADORA de mensajes azules específicos
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Iniciando sistema Errekalde Car Wash...');
+    
+    // Inicializar elementos del DOM
+    setupEventListeners();
+    initializeCalendar();
+    
+    // Inicializar espacios en el servidor
+    inicializarEspaciosEnServidor();
+    
+    // INICIALIZAR SISTEMA DE SINCRONIZACIÓN UNIVERSAL
+    console.log('🔄 Iniciando sincronización universal entre dispositivos...');
+    inicializarSincronizacionAutomatica();
+    
+    // Limpieza conservadora de mensajes azules específicos
     const cleanUpBlueMessages = () => {
         console.log('🧹 Limpieza conservadora de mensajes azules...');
         
@@ -1533,7 +1695,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(cleanUpBlueMessages, 500);
     setTimeout(cleanUpBlueMessages, 1000);
     
-    console.log('✅ Sistema de limpieza conservadora activado');
+    console.log('✅ Sistema iniciado correctamente con sincronización universal');
 });
 
 // Exportar funciones para testing

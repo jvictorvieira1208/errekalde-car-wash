@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Errekalde Car Wash - SWAP ENERGIA{% endblock %}</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Sistema de reservas exclusivo para trabajadores de SWAP ENERGIA">
+    <meta name="keywords" content="car wash, lavado de coches, SWAP ENERGIA, reservas">
+    <meta name="author" content="SWAP ENERGIA">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Mobile Optimizations -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Car Wash">
+    <meta name="application-name" content="Errekalde Car Wash">
+    <meta name="msapplication-TileColor" content="#1e3a8a">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+    
+    <!-- Theme Colors -->
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="msapplication-navbutton-color" content="#3b82f6">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- Favicons -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+    <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#1e3a8a">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ app.request.uri }}">
+    <meta property="og:title" content="Errekalde Car Wash - SWAP ENERGIA">
+    <meta property="og:description" content="Sistema de reservas exclusivo para trabajadores de SWAP ENERGIA">
+    <meta property="og:image" content="{{ app.request.schemeAndHttpHost }}/icons/og-image.png">
+    <meta property="og:site_name" content="Errekalde Car Wash">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{{ app.request.uri }}">
+    <meta property="twitter:title" content="Errekalde Car Wash - SWAP ENERGIA">
+    <meta property="twitter:description" content="Sistema de reservas exclusivo para trabajadores de SWAP ENERGIA">
+    <meta property="twitter:image" content="{{ app.request.schemeAndHttpHost }}/icons/og-image.png">
+    
+    <!-- Preload Critical Resources -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" as="style">
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" as="style">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --primary-color: #1e3a8a;
+            --secondary-color: #3b82f6;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dark-color: #1f2937;
+            --light-gray: #f8fafc;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--light-gray) 0%, #e2e8f0 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            user-select: none; /* Prevent text selection on mobile */
+            -webkit-touch-callout: none; /* Disable iOS callout */
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        /* PWA Install Prompt */
+        .pwa-install-prompt {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 1060;
+            display: none;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .pwa-install-prompt .btn-close {
+            filter: invert(1);
+        }
+
+        /* Improved touch targets for mobile */
+        .btn, .nav-step, .calendar-day, .service-card {
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        /* iOS safe area handling */
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
+        }
+
+        /* Improved mobile scrolling */
+        .page {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            border-radius: 10px;
+            padding: 12px 30px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            border: none;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--primary-color) !important;
+        }
+
+        .calendar-day {
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            touch-action: manipulation; /* Optimize touch */
+        }
+
+        .calendar-day:hover {
+            transform: scale(1.05);
+        }
+
+        .calendar-day.available {
+            background: linear-gradient(45deg, var(--success-color), #34d399);
+            color: white;
+        }
+
+        .calendar-day.limited {
+            background: linear-gradient(45deg, var(--warning-color), #fbbf24);
+            color: white;
+        }
+
+        .calendar-day.full {
+            background: linear-gradient(45deg, var(--danger-color), #f87171);
+            color: white;
+        }
+
+        .calendar-day.selected {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+        }
+
+        .spaces-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--dark-color);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .service-card {
+            border: 2px solid transparent;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .service-card:hover {
+            border-color: var(--secondary-color);
+            transform: translateY(-3px);
+        }
+
+        .service-card.selected {
+            border-color: var(--primary-color);
+            background: linear-gradient(45deg, rgba(30, 58, 138, 0.1), rgba(59, 130, 246, 0.1));
+        }
+
+        .form-control {
+            border-radius: 10px;
+            border: 2px solid #e5e7eb;
+            padding: 12px 16px;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+        }
+
+        .progress {
+            height: 8px;
+            border-radius: 10px;
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .progress-bar {
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            border-radius: 10px;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            max-width: calc(100vw - 40px);
+        }
+
+        .sync-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            border-radius: 50px;
+            padding: 10px 20px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .sync-indicator.connected {
+            color: var(--success-color);
+        }
+
+        .sync-indicator.disconnected {
+            color: var(--danger-color);
+        }
+
+        .sync-indicator.syncing {
+            color: var(--warning-color);
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Offline indicator */
+        .offline-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--warning-color);
+            color: white;
+            text-align: center;
+            padding: 10px;
+            z-index: 1070;
+            display: none;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Mobile responsive improvements */
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 10px;
+                padding-bottom: calc(10px + env(safe-area-inset-bottom));
+            }
+            
+            .card {
+                margin-bottom: 20px;
+            }
+            
+            .calendar-day {
+                font-size: 0.9rem;
+            }
+
+            .btn-lg {
+                padding: 10px 20px;
+                font-size: 1rem;
+            }
+
+            .navbar-brand {
+                font-size: 1.2rem;
+            }
+
+            .notification {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                max-width: none;
+            }
+
+            .sync-indicator {
+                bottom: 10px;
+                right: 10px;
+                padding: 8px 16px;
+                font-size: 0.8rem;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+                color: #f9fafb;
+            }
+
+            .card {
+                background: #374151;
+                color: #f9fafb;
+            }
+
+            .form-control {
+                background: #4b5563;
+                border-color: #6b7280;
+                color: #f9fafb;
+            }
+
+            .sync-indicator {
+                background: #374151;
+                color: #f9fafb;
+            }
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            .calendar-day.available {
+                background: #059669;
+            }
+
+            .calendar-day.limited {
+                background: #d97706;
+            }
+
+            .calendar-day.full {
+                background: #dc2626;
+            }
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+    
+    {% block stylesheets %}{% endblock %}
+</head>
+<body>
+    <!-- Offline Banner -->
+    <div id="offlineBanner" class="offline-banner">
+        <i class="bi bi-wifi-off me-2"></i>
+        Sin conexión - Funcionalidad limitada
+    </div>
+
+    <!-- PWA Install Prompt -->
+    <div id="pwaInstallPrompt" class="pwa-install-prompt">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <strong>🚗 Instalar App</strong>
+                <p class="mb-0 small">Instala la app para acceso rápido y uso offline</p>
+            </div>
+            <div>
+                <button id="pwaInstallBtn" class="btn btn-light btn-sm me-2">Instalar</button>
+                <button type="button" class="btn-close" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="{{ path('app_home') }}">
+                <i class="bi bi-car-front-fill me-2"></i>
+                Errekalde Car Wash
+            </a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text">
+                    <i class="bi bi-building-fill me-1"></i>
+                    SWAP ENERGIA
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-container">
+        {% block body %}{% endblock %}
+    </main>
+
+    <!-- Sync Indicator -->
+    <div id="syncIndicator" class="sync-indicator">
+        <i class="bi bi-wifi me-2"></i>
+        <span id="syncStatus">Conectando...</span>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // Variables globales
+        let currentPage = 1;
+        let selectedDate = null;
+        let availableSpaces = 8;
+        let verificationCode = '';
+        let isVerified = false;
+        let espaciosGlobales = {};
+        let lastSyncTime = null;
+        let syncStatus = 'conectado';
+        let isOnline = navigator.onLine;
+        let deferredPrompt = null;
+        let reservationData = {
+            date: null,
+            name: '',
+            phone: '',
+            carBrand: '',
+            carModel: '',
+            carSize: '',
+            services: [],
+            serviceNames: [],
+            price: 0,
+            notas: ''
+        };
+
+        // Configuración del servidor
+        const SERVER_URL = window.location.origin;
+        const IS_PRODUCTION = !window.location.hostname.includes('localhost');
+
+        // PWA Installation
+        window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('💾 PWA Install prompt available');
+            e.preventDefault();
+            deferredPrompt = e;
+            showInstallPrompt();
+        });
+
+        function showInstallPrompt() {
+            const prompt = document.getElementById('pwaInstallPrompt');
+            const installBtn = document.getElementById('pwaInstallBtn');
+            const closeBtn = prompt.querySelector('.btn-close');
+
+            if (localStorage.getItem('pwa-install-dismissed') === 'true') {
+                return;
+            }
+
+            prompt.style.display = 'block';
+
+            installBtn.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log(`💾 PWA Install outcome: ${outcome}`);
+                    deferredPrompt = null;
+                }
+                prompt.style.display = 'none';
+            });
+
+            closeBtn.addEventListener('click', () => {
+                prompt.style.display = 'none';
+                localStorage.setItem('pwa-install-dismissed', 'true');
+            });
+        }
+
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('✅ Service Worker registered:', registration);
+                        
+                        // Check for updates
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    showNotification('Nueva versión disponible. Recarga la página.', 'info');
+                                }
+                            });
+                        });
+                    })
+                    .catch(error => {
+                        console.error('❌ Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        // Online/Offline Detection
+        window.addEventListener('online', () => {
+            isOnline = true;
+            document.getElementById('offlineBanner').style.display = 'none';
+            updateSyncStatus('connected');
+            sincronizarEspaciosGlobal();
+            console.log('🟢 Back online');
+        });
+
+        window.addEventListener('offline', () => {
+            isOnline = false;
+            document.getElementById('offlineBanner').style.display = 'block';
+            updateSyncStatus('disconnected');
+            console.log('🔴 Gone offline');
+        });
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔧 DEBUG INFO - Dispositivo:', {
+                hostname: window.location.hostname,
+                isProduction: IS_PRODUCTION,
+                serverUrl: SERVER_URL,
+                userAgent: navigator.userAgent.substr(0, 50) + '...',
+                screenSize: `${screen.width}x${screen.height}`,
+                viewportSize: `${window.innerWidth}x${window.innerHeight}`,
+                isOnline: navigator.onLine,
+                serviceWorkerSupport: 'serviceWorker' in navigator,
+                notificationSupport: 'Notification' in window
+            });
+            
+            // Check initial online status
+            if (!navigator.onLine) {
+                document.getElementById('offlineBanner').style.display = 'block';
+                updateSyncStatus('disconnected');
+            }
+            
+            // Initialize notifications
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+            
+            // Inicializar sistema de sincronización
+            inicializarSincronizacion();
+        });
+
+        // Sistema de sincronización
+        async function sincronizarEspaciosGlobal() {
+            try {
+                updateSyncStatus('syncing');
+                
+                const response = await fetch(`${SERVER_URL}/api/sync-espacios`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.espacios) {
+                    const espaciosAnteriores = { ...espaciosGlobales };
+                    espaciosGlobales = data.espacios;
+                    lastSyncTime = new Date();
+                    
+                    // Detectar cambios y actualizar UI
+                    detectarCambiosEspacios(espaciosAnteriores, espaciosGlobales);
+                    actualizarCalendarioConEspacios();
+                    updateSyncStatus('connected');
+                    
+                    console.log('✅ Sincronización exitosa:', data.timestamp);
+                } else {
+                    throw new Error('Respuesta inválida del servidor');
+                }
+                
+            } catch (error) {
+                console.error('❌ Error en sincronización:', error);
+                updateSyncStatus('disconnected');
+                
+                // If offline, try to use cached data
+                if (!navigator.onLine) {
+                    console.log('📱 Usando datos offline...');
+                    return;
+                }
+                
+                // Reintento en 10 segundos solo si estamos online
+                if (navigator.onLine) {
+                    setTimeout(sincronizarEspaciosGlobal, 10000);
+                }
+            }
+        }
+
+        function updateSyncStatus(status) {
+            const indicator = document.getElementById('syncIndicator');
+            const statusText = document.getElementById('syncStatus');
+            
+            if (!indicator || !statusText) return;
+            
+            indicator.className = `sync-indicator ${status}`;
+            
+            switch (status) {
+                case 'connected':
+                    statusText.textContent = 'Conectado';
+                    indicator.innerHTML = '<i class="bi bi-wifi me-2"></i><span>Conectado</span>';
+                    break;
+                case 'syncing':
+                    statusText.textContent = 'Sincronizando...';
+                    indicator.innerHTML = '<i class="bi bi-arrow-repeat me-2"></i><span>Sincronizando...</span>';
+                    break;
+                case 'disconnected':
+                    statusText.textContent = 'Sin conexión';
+                    indicator.innerHTML = '<i class="bi bi-wifi-off me-2"></i><span>Sin conexión</span>';
+                    break;
+            }
+        }
+
+        function detectarCambiosEspacios(espaciosAnteriores, espaciosNuevos) {
+            for (const fecha in espaciosNuevos) {
+                if (espaciosAnteriores[fecha] && espaciosAnteriores[fecha] !== espaciosNuevos[fecha]) {
+                    const diferencia = espaciosNuevos[fecha] - espaciosAnteriores[fecha];
+                    
+                    if (diferencia < 0) {
+                        showNotification(
+                            `Nueva reserva para ${fecha}. Espacios disponibles: ${espaciosNuevos[fecha]}`,
+                            'info'
+                        );
+                    } else if (diferencia > 0) {
+                        showNotification(
+                            `Reserva cancelada para ${fecha}. Espacios disponibles: ${espaciosNuevos[fecha]}`,
+                            'warning'
+                        );
+                    }
+                }
+            }
+        }
+
+        function inicializarSincronizacion() {
+            // Sincronización inicial
+            sincronizarEspaciosGlobal();
+            
+            // Sincronización cada 5 segundos solo si estamos online
+            setInterval(() => {
+                if (navigator.onLine) {
+                    sincronizarEspaciosGlobal();
+                }
+            }, 5000);
+            
+            // Sincronización al volver a la pestaña
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && navigator.onLine) {
+                    sincronizarEspaciosGlobal();
+                }
+            });
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type} notification alert-dismissible fade show`;
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+
+            // Show browser notification if supported and permission granted
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Errekalde Car Wash', {
+                    body: message,
+                    icon: '/icons/icon-192x192.png',
+                    badge: '/icons/badge-72x72.png',
+                    tag: 'car-wash-notification'
+                });
+            }
+        }
+
+        // Placeholder functions (to be implemented)
+        function actualizarCalendarioConEspacios() {
+            // Implementation depends on calendar structure
+            console.log('📅 Actualizando calendario con espacios:', espaciosGlobales);
+        }
+
+        // Touch optimizations
+        let touchStartY = 0;
+        let touchEndY = 0;
+
+        document.addEventListener('touchstart', e => {
+            touchStartY = e.changedTouches[0].screenY;
+        });
+
+        document.addEventListener('touchend', e => {
+            touchEndY = e.changedTouches[0].screenY;
+            handleSwipe();
+        });
+
+        function handleSwipe() {
+            const swipeThreshold = 50;
+            const diff = touchStartY - touchEndY;
+
+            if (Math.abs(diff) > swipeThreshold) {
+                // Add swipe gestures here if needed
+                console.log('Swipe detected:', diff > 0 ? 'up' : 'down');
+            }
+        }
+    </script>
+    
+    {% block javascripts %}{% endblock %}
+</body>
+</html>

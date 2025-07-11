@@ -1,0 +1,62 @@
+# This file is the entry point to configure your own services.
+# Files in the packages/ subdirectory configure your dependencies.
+
+# Put parameters here that don't need to change on each machine where the app is deployed
+# https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
+parameters:
+    car_wash.default_spaces: '%env(int:CAR_WASH_DEFAULT_SPACES)%'
+    car_wash.weeks_ahead: '%env(int:CAR_WASH_WEEKS_AHEAD)%'
+    car_wash.only_wednesdays: '%env(bool:CAR_WASH_ONLY_WEDNESDAYS)%'
+    car_wash.frontend_url: '%env(FRONTEND_URL)%'
+    car_wash.n8n_webhook_url: '%env(N8N_WEBHOOK_URL)%'
+    car_wash.n8n_validation_url: '%env(N8N_VALIDATION_URL)%'
+
+services:
+    # default configuration for services in *this* file
+    _defaults:
+        autowire: true      # Automatically injects dependencies in your services.
+        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+
+    # makes classes in src/ available to be used as services
+    # this creates a service per class whose id is the fully-qualified class name
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+    # add more service definitions when explicit configuration is needed
+    # please note that last definitions always *replace* previous ones
+
+    # Car Wash Services
+    App\Service\RealtimeSyncService:
+        arguments:
+            $hub: '@mercure.hub.default'
+
+    App\Service\WhatsAppService:
+        arguments:
+            $n8nWebhookUrl: '%car_wash.n8n_webhook_url%'
+            $n8nValidationUrl: '%car_wash.n8n_validation_url%'
+
+    App\Service\ReservationService:
+        arguments:
+            $entityManager: '@doctrine.orm.entity_manager'
+
+    # Controllers
+    App\Controller\:
+        resource: '../src/Controller/'
+        tags: ['controller.service_arguments']
+
+when@test:
+    services:
+        # Mock services for testing
+        App\Service\WhatsAppService:
+            class: App\Tests\Mock\MockWhatsAppService
+
+when@prod:
+    services:
+        # Production-specific configurations
+        App\Service\RealtimeSyncService:
+            calls:
+                - [setLogger, ['@logger']] 

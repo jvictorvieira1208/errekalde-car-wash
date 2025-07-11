@@ -1,0 +1,987 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block stylesheets %}
+<style>
+    .nav-step {
+        padding: 10px;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .nav-step.active {
+        background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        transform: scale(1.1);
+    }
+    
+    .nav-step.completed {
+        background: var(--success-color);
+        color: white;
+    }
+    
+    .service-card {
+        height: 100%;
+        transition: all 0.3s ease;
+    }
+    
+    .service-card.selected {
+        border: 2px solid var(--primary-color);
+        background: linear-gradient(45deg, rgba(30, 58, 138, 0.1), rgba(59, 130, 246, 0.1));
+        transform: translateY(-3px);
+    }
+    
+    .verification-input {
+        font-size: 1.5rem;
+        letter-spacing: 0.5rem;
+        text-align: center;
+    }
+    
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255,255,255,.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .reservation-summary {
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        border-radius: 15px;
+        padding: 20px;
+        border: 2px solid #e5e7eb;
+    }
+    
+    .summary-item {
+        padding: 10px 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .summary-item:last-child {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8 mx-auto">
+            <!-- Welcome Header -->
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <h1 class="card-title mb-3">
+                        <i class="bi bi-car-front-fill text-primary me-3"></i>
+                        Errekalde Car Wash
+                    </h1>
+                    <p class="card-text lead">
+                        Sistema de reservas exclusivo para trabajadores de SWAP ENERGIA
+                    </p>
+                    <div class="row text-center mt-4">
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <i class="bi bi-calendar-check text-success me-2"></i>
+                                <span class="fw-bold">Solo Miércoles</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <i class="bi bi-clock text-primary me-2"></i>
+                                <span class="fw-bold">Sincronización Real</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <i class="bi bi-phone text-warning me-2"></i>
+                                <span class="fw-bold">Verificación WhatsApp</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Steps -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="progress mb-3" style="height: 10px;">
+                        <div id="progressBar" class="progress-bar" role="progressbar" style="width: 20%"></div>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col" data-step="1">
+                            <div class="nav-step active" data-page="1">
+                                <i class="bi bi-calendar3"></i>
+                                <small class="d-block mt-1">Fecha</small>
+                            </div>
+                        </div>
+                        <div class="col" data-step="2">
+                            <div class="nav-step" data-page="2">
+                                <i class="bi bi-person-fill"></i>
+                                <small class="d-block mt-1">Datos</small>
+                            </div>
+                        </div>
+                        <div class="col" data-step="3">
+                            <div class="nav-step" data-page="3">
+                                <i class="bi bi-phone-fill"></i>
+                                <small class="d-block mt-1">Verificar</small>
+                            </div>
+                        </div>
+                        <div class="col" data-step="4">
+                            <div class="nav-step" data-page="4">
+                                <i class="bi bi-gear-fill"></i>
+                                <small class="d-block mt-1">Servicios</small>
+                            </div>
+                        </div>
+                        <div class="col" data-step="5">
+                            <div class="nav-step" data-page="5">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <small class="d-block mt-1">Confirmar</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page 1: Calendar -->
+            <div id="page-1" class="page active">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-calendar3 me-2"></i>
+                            Selecciona la fecha de tu reserva
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Calendar Header -->
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <button id="prevMonth" class="btn btn-outline-primary">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                            <h4 id="currentMonth" class="mb-0 fw-bold"></h4>
+                            <button id="nextMonth" class="btn btn-outline-primary">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+
+                        <!-- Calendar Grid -->
+                        <div class="row g-2 mb-4">
+                            <div class="col text-center fw-bold">Dom</div>
+                            <div class="col text-center fw-bold">Lun</div>
+                            <div class="col text-center fw-bold">Mar</div>
+                            <div class="col text-center fw-bold">Mié</div>
+                            <div class="col text-center fw-bold">Jue</div>
+                            <div class="col text-center fw-bold">Vie</div>
+                            <div class="col text-center fw-bold">Sáb</div>
+                        </div>
+                        <div id="calendarDays" class="row g-2"></div>
+
+                        <!-- Selected Date Info -->
+                        <div id="selectedDateInfo" class="mt-4 p-3 bg-light rounded" style="display: none;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-0">Fecha seleccionada:</h6>
+                                    <span id="selectedDate" class="fw-bold text-primary"></span>
+                                </div>
+                                <div class="text-end">
+                                    <h6 class="mb-0">Espacios disponibles:</h6>
+                                    <span id="availableSpaces" class="fw-bold text-success fs-5"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-4">
+                            <button id="nextToPage2" class="btn btn-primary btn-lg" disabled>
+                                Continuar <i class="bi bi-arrow-right ms-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page 2: Personal Data -->
+            <div id="page-2" class="page" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-person-fill me-2"></i>
+                            Datos personales y del vehículo
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="personalDataForm">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="name" class="form-label">Nombre completo *</label>
+                                    <input type="text" class="form-control" id="name" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="phone" class="form-label">Teléfono *</label>
+                                    <input type="tel" class="form-control" id="phone" required placeholder="Ej: +34 600 123 456">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="car-brand" class="form-label">Marca del vehículo *</label>
+                                    <input type="text" class="form-control" id="car-brand" required placeholder="Ej: Toyota, BMW, Seat...">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="car-model" class="form-label">Modelo del vehículo *</label>
+                                    <input type="text" class="form-control" id="car-model" required placeholder="Ej: Corolla, X3, León...">
+                                </div>
+                                <div class="col-12">
+                                    <label for="car-size" class="form-label">Tamaño del vehículo *</label>
+                                    <select class="form-select" id="car-size" required>
+                                        <option value="">Selecciona el tamaño</option>
+                                        <option value="small">Pequeño (hasta 4.2m) - Utilitarios</option>
+                                        <option value="medium">Mediano (4.2m - 4.8m) - Compactos/Sedán</option>
+                                        <option value="large">Grande (más de 4.8m) - SUV/Familiar</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label for="notas" class="form-label">Notas adicionales</label>
+                                    <textarea class="form-control" id="notas" rows="2" placeholder="Cualquier información adicional..."></textarea>
+                                </div>
+                            </div>
+                        </form>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button id="prevToPage1" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i> Anterior
+                            </button>
+                            <button id="nextToPage3" class="btn btn-primary" disabled>
+                                Continuar <i class="bi bi-arrow-right ms-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page 3: Phone Verification -->
+            <div id="page-3" class="page" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-phone-fill me-2"></i>
+                            Verificación de teléfono
+                        </h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <div id="sendCodeSection">
+                            <p class="mb-4">Te enviaremos un código de verificación por WhatsApp al número:</p>
+                            <div class="alert alert-info">
+                                <i class="bi bi-phone me-2"></i>
+                                <strong id="phoneToVerify"></strong>
+                            </div>
+                            <button id="sendCode" class="btn btn-success btn-lg">
+                                <i class="bi bi-whatsapp me-2"></i>
+                                Enviar código por WhatsApp
+                            </button>
+                        </div>
+
+                        <div id="verifyCodeSection" style="display: none;">
+                            <p class="mb-4">Introduce el código de 6 dígitos que has recibido</p>
+                            <div class="row justify-content-center">
+                                <div class="col-md-6">
+                                    <input type="text" id="verificationCode" class="form-control form-control-lg verification-input" 
+                                           maxlength="6" placeholder="000000">
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <button id="verifyCode" class="btn btn-primary btn-lg me-3">Verificar</button>
+                                <button id="resendCode" class="btn btn-outline-secondary">Reenviar código</button>
+                            </div>
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    💡 Para pruebas, usa el código: <strong>123456</strong>
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button id="prevToPage2" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i> Anterior
+                            </button>
+                            <button id="nextToPage4" class="btn btn-primary" disabled>
+                                Continuar <i class="bi bi-arrow-right ms-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page 4: Services -->
+            <div id="page-4" class="page" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-gear-fill me-2"></i>
+                            Selecciona los servicios
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="servicesContainer" class="row g-3">
+                            <!-- Services will be loaded here -->
+                        </div>
+
+                        <div id="selectedServicesSummary" class="mt-4 p-3 bg-light rounded" style="display: none;">
+                            <h6>Servicios seleccionados:</h6>
+                            <div id="servicesList"></div>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <strong>Precio total:</strong>
+                                <strong id="totalPrice" class="fs-5 text-primary">€0.00</strong>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button id="prevToPage3" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i> Anterior
+                            </button>
+                            <button id="nextToPage5" class="btn btn-primary" disabled>
+                                Continuar <i class="bi bi-arrow-right ms-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page 5: Confirmation -->
+            <div id="page-5" class="page" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-check-circle-fill me-2"></i>
+                            Confirmar reserva
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="reservationSummary" class="reservation-summary">
+                            <!-- Summary will be generated here -->
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button id="prevToPage4" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i> Anterior
+                            </button>
+                            <button id="confirmReservation" class="btn btn-success btn-lg">
+                                <i class="bi bi-check-circle-fill me-2"></i>
+                                Confirmar Reserva
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success Page -->
+            <div id="page-success" class="page" style="display: none;">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div class="mb-4">
+                            <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+                        </div>
+                        <h2 class="text-success mb-3">¡Reserva confirmada!</h2>
+                        <div id="finalSummary" class="reservation-summary">
+                            <!-- Final summary will be generated here -->
+                        </div>
+                        <button id="newReservation" class="btn btn-primary btn-lg mt-4">
+                            <i class="bi bi-plus-circle-fill me-2"></i>
+                            Nueva Reserva
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+<script>
+    // Complete JavaScript functionality for the car wash system
+    let currentDate = new Date();
+    let currentMonth = currentDate.getMonth();
+    let currentYear = currentDate.getFullYear();
+
+    // Available services
+    const availableServices = [
+        { id: 'lavado-basico', name: 'Lavado Básico', price: 15, description: 'Lavado exterior con jabón y aclarado' },
+        { id: 'lavado-premium', name: 'Lavado Premium', price: 25, description: 'Lavado exterior + interior + aspirado' },
+        { id: 'lavado-completo', name: 'Lavado Completo', price: 40, description: 'Premium + encerado + llantas + motor' },
+        { id: 'encerado', name: 'Encerado', price: 15, description: 'Aplicación de cera protectora' },
+        { id: 'limpieza-interior', name: 'Limpieza Interior', price: 20, description: 'Aspirado + limpieza tapicería' },
+        { id: 'lavado-motor', name: 'Lavado Motor', price: 12, description: 'Limpieza del compartimento motor' }
+    ];
+
+    // Initialize calendar and sync with real data
+    function initializeCalendar() {
+        renderCalendar();
+        updateNavigation();
+        // Load real availability data
+        sincronizarEspaciosGlobal();
+    }
+
+    function renderCalendar() {
+        const monthNames = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ];
+
+        document.getElementById('currentMonth').textContent = 
+            `${monthNames[currentMonth]} ${currentYear}`;
+
+        const firstDay = new Date(currentYear, currentMonth, 1);
+        const lastDay = new Date(currentYear, currentMonth + 1, 0);
+        const startDate = new Date(firstDay);
+        startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+        const calendarDays = document.getElementById('calendarDays');
+        calendarDays.innerHTML = '';
+
+        for (let i = 0; i < 42; i++) {
+            const date = new Date(startDate);
+            date.setDate(startDate.getDate() + i);
+
+            const dayDiv = document.createElement('div');
+            dayDiv.className = 'col';
+            
+            const isCurrentMonth = date.getMonth() === currentMonth;
+            const isWednesday = date.getDay() === 3;
+            const isToday = date.toDateString() === new Date().toDateString();
+            const isFuture = date > new Date();
+
+            if (isCurrentMonth && isWednesday && isFuture) {
+                const dateStr = date.toISOString().split('T')[0];
+                const spaces = getAvailableSpacesForDate(dateStr);
+                const statusClass = getStatusClass(spaces);
+                
+                dayDiv.innerHTML = `
+                    <div class="calendar-day ${statusClass}" data-date="${dateStr}">
+                        ${date.getDate()}
+                        <span class="spaces-badge">${spaces}</span>
+                    </div>
+                `;
+                dayDiv.querySelector('.calendar-day').addEventListener('click', () => selectDate(date, dayDiv.querySelector('.calendar-day'), spaces));
+            } else {
+                dayDiv.innerHTML = `
+                    <div class="calendar-day ${isCurrentMonth ? 'text-muted' : 'text-muted'}" style="cursor: default;">
+                        ${date.getDate()}
+                    </div>
+                `;
+            }
+
+            calendarDays.appendChild(dayDiv);
+        }
+    }
+
+    function getAvailableSpacesForDate(dateStr) {
+        // Convert date to match the format from espaciosGlobales
+        const date = new Date(dateStr + 'T00:00:00');
+        for (const [key, spaces] of Object.entries(espaciosGlobales)) {
+            const keyDate = new Date(key);
+            if (keyDate.toDateString() === date.toDateString()) {
+                return spaces;
+            }
+        }
+        return 8; // Default value
+    }
+
+    function getStatusClass(spaces) {
+        if (spaces >= 6) return 'available';
+        if (spaces >= 1) return 'limited';
+        return 'full';
+    }
+
+    function selectDate(date, dayElement, spaces) {
+        if (spaces <= 0) {
+            showNotification('Esta fecha está completa. Selecciona otra fecha.', 'warning');
+            return;
+        }
+
+        // Remove previous selection
+        document.querySelectorAll('.calendar-day.selected').forEach(day => {
+            day.classList.remove('selected');
+        });
+
+        // Add selection to current day
+        dayElement.classList.add('selected');
+        
+        selectedDate = date;
+        availableSpaces = spaces;
+        reservationData.date = date.toISOString().split('T')[0];
+
+        // Update UI
+        document.getElementById('selectedDate').textContent = 
+            date.toLocaleDateString('es-ES', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+        
+        document.getElementById('availableSpaces').textContent = spaces;
+        document.getElementById('selectedDateInfo').style.display = 'block';
+        document.getElementById('nextToPage2').disabled = false;
+
+        updateProgress(40);
+    }
+
+    function changeMonth(delta) {
+        currentMonth += delta;
+        if (currentMonth > 11) {
+            currentMonth = 0;
+            currentYear++;
+        } else if (currentMonth < 0) {
+            currentMonth = 11;
+            currentYear--;
+        }
+        renderCalendar();
+    }
+
+    function updateProgress(percentage) {
+        document.getElementById('progressBar').style.width = percentage + '%';
+    }
+
+    function updateNavigation() {
+        document.querySelectorAll('.nav-step').forEach((step, index) => {
+            const pageNum = index + 1;
+            step.classList.remove('active', 'completed');
+            
+            if (pageNum === currentPage) {
+                step.classList.add('active');
+            } else if (pageNum < currentPage) {
+                step.classList.add('completed');
+            }
+        });
+    }
+
+    function goToPage(pageNum) {
+        // Hide all pages
+        document.querySelectorAll('.page').forEach(page => page.style.display = 'none');
+        
+        // Show target page
+        const targetPage = document.getElementById(`page-${pageNum}`);
+        if (targetPage) {
+            targetPage.style.display = 'block';
+            currentPage = pageNum;
+            updateNavigation();
+            
+            // Update progress
+            const progress = (pageNum / 5) * 100;
+            updateProgress(progress);
+
+            // Special actions for specific pages
+            if (pageNum === 3) {
+                // Update phone verification page
+                document.getElementById('phoneToVerify').textContent = reservationData.phone;
+            } else if (pageNum === 4) {
+                // Load services
+                loadServices();
+            } else if (pageNum === 5) {
+                // Generate summary
+                generateReservationSummary();
+            }
+        }
+    }
+
+    // Phone verification functionality
+    function setupPhoneVerification() {
+        const sendCodeBtn = document.getElementById('sendCode');
+        const verifyCodeBtn = document.getElementById('verifyCode');
+        const resendCodeBtn = document.getElementById('resendCode');
+        const verificationInput = document.getElementById('verificationCode');
+
+        sendCodeBtn.addEventListener('click', sendVerificationCode);
+        verifyCodeBtn.addEventListener('click', verifyCode);
+        resendCodeBtn.addEventListener('click', sendVerificationCode);
+
+        verificationInput.addEventListener('input', function() {
+            this.value = this.value.replace(/\D/g, '').substring(0, 6);
+        });
+    }
+
+    function sendVerificationCode() {
+        const sendCodeSection = document.getElementById('sendCodeSection');
+        const verifyCodeSection = document.getElementById('verifyCodeSection');
+        const sendCodeBtn = document.getElementById('sendCode');
+
+        // Show loading
+        sendCodeBtn.innerHTML = '<span class="loading-spinner"></span> Enviando...';
+        sendCodeBtn.disabled = true;
+
+        // Simulate API call
+        setTimeout(() => {
+            // In real implementation, this would send actual WhatsApp message
+            console.log('📱 Enviando código WhatsApp a:', reservationData.phone);
+            
+            verificationCode = '123456'; // In production, this would be random
+            
+            sendCodeSection.style.display = 'none';
+            verifyCodeSection.style.display = 'block';
+            
+            showNotification('Código enviado por WhatsApp (prueba: 123456)', 'success');
+        }, 2000);
+    }
+
+    function verifyCode() {
+        const inputCode = document.getElementById('verificationCode').value;
+        const verifyBtn = document.getElementById('verifyCode');
+
+        if (inputCode.length !== 6) {
+            showNotification('Introduce un código de 6 dígitos', 'warning');
+            return;
+        }
+
+        verifyBtn.innerHTML = '<span class="loading-spinner"></span> Verificando...';
+        verifyBtn.disabled = true;
+
+        setTimeout(() => {
+            if (inputCode === '123456') {
+                isVerified = true;
+                document.getElementById('nextToPage4').disabled = false;
+                showNotification('¡Teléfono verificado correctamente!', 'success');
+                updateProgress(80);
+            } else {
+                showNotification('Código incorrecto. Inténtalo de nuevo.', 'danger');
+                verifyBtn.innerHTML = 'Verificar';
+                verifyBtn.disabled = false;
+            }
+        }, 1500);
+    }
+
+    // Services functionality
+    function loadServices() {
+        const container = document.getElementById('servicesContainer');
+        container.innerHTML = '';
+
+        availableServices.forEach(service => {
+            const serviceCard = document.createElement('div');
+            serviceCard.className = 'col-md-6';
+            serviceCard.innerHTML = `
+                <div class="card service-card h-100" data-service-id="${service.id}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h6 class="card-title">${service.name}</h6>
+                            <span class="badge bg-primary fs-6">€${service.price}</span>
+                        </div>
+                        <p class="card-text text-muted">${service.description}</p>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="service-${service.id}">
+                            <label class="form-check-label" for="service-${service.id}">
+                                Seleccionar este servicio
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const checkbox = serviceCard.querySelector('input[type="checkbox"]');
+            const card = serviceCard.querySelector('.service-card');
+
+            checkbox.addEventListener('change', () => {
+                if (checkbox.checked) {
+                    card.classList.add('selected');
+                    addService(service);
+                } else {
+                    card.classList.remove('selected');
+                    removeService(service.id);
+                }
+                updateServicesSummary();
+            });
+
+            container.appendChild(serviceCard);
+        });
+    }
+
+    function addService(service) {
+        if (!reservationData.services.includes(service.id)) {
+            reservationData.services.push(service.id);
+            reservationData.serviceNames.push(service.name);
+            reservationData.price += service.price;
+        }
+    }
+
+    function removeService(serviceId) {
+        const index = reservationData.services.indexOf(serviceId);
+        if (index > -1) {
+            const service = availableServices.find(s => s.id === serviceId);
+            reservationData.services.splice(index, 1);
+            reservationData.serviceNames.splice(index, 1);
+            reservationData.price -= service.price;
+        }
+    }
+
+    function updateServicesSummary() {
+        const summary = document.getElementById('selectedServicesSummary');
+        const servicesList = document.getElementById('servicesList');
+        const totalPrice = document.getElementById('totalPrice');
+        const nextBtn = document.getElementById('nextToPage5');
+
+        if (reservationData.services.length > 0) {
+            summary.style.display = 'block';
+            
+            servicesList.innerHTML = reservationData.serviceNames.map(name => 
+                `<div class="d-flex justify-content-between">
+                    <span>${name}</span>
+                    <span>€${availableServices.find(s => s.name === name).price}</span>
+                </div>`
+            ).join('');
+            
+            totalPrice.textContent = `€${reservationData.price.toFixed(2)}`;
+            nextBtn.disabled = false;
+        } else {
+            summary.style.display = 'none';
+            nextBtn.disabled = true;
+        }
+    }
+
+    // Reservation summary and confirmation
+    function generateReservationSummary() {
+        const summary = document.getElementById('reservationSummary');
+        const selectedDate = new Date(reservationData.date);
+        
+        summary.innerHTML = `
+            <h5 class="mb-3">Resumen de tu reserva</h5>
+            
+            <div class="summary-item">
+                <div class="row">
+                    <div class="col-sm-4"><strong>Fecha:</strong></div>
+                    <div class="col-sm-8">
+                        ${selectedDate.toLocaleDateString('es-ES', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        })}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="summary-item">
+                <div class="row">
+                    <div class="col-sm-4"><strong>Cliente:</strong></div>
+                    <div class="col-sm-8">${reservationData.name}</div>
+                </div>
+            </div>
+            
+            <div class="summary-item">
+                <div class="row">
+                    <div class="col-sm-4"><strong>Teléfono:</strong></div>
+                    <div class="col-sm-8">${reservationData.phone}</div>
+                </div>
+            </div>
+            
+            <div class="summary-item">
+                <div class="row">
+                    <div class="col-sm-4"><strong>Vehículo:</strong></div>
+                    <div class="col-sm-8">${reservationData.carBrand} ${reservationData.carModel}</div>
+                </div>
+            </div>
+            
+            <div class="summary-item">
+                <div class="row">
+                    <div class="col-sm-4"><strong>Tamaño:</strong></div>
+                    <div class="col-sm-8">
+                        ${reservationData.carSize === 'small' ? 'Pequeño' : 
+                          reservationData.carSize === 'medium' ? 'Mediano' : 'Grande'}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="summary-item">
+                <div class="row">
+                    <div class="col-sm-4"><strong>Servicios:</strong></div>
+                    <div class="col-sm-8">
+                        ${reservationData.serviceNames.join(', ')}
+                    </div>
+                </div>
+            </div>
+            
+            ${reservationData.notas ? `
+                <div class="summary-item">
+                    <div class="row">
+                        <div class="col-sm-4"><strong>Notas:</strong></div>
+                        <div class="col-sm-8">${reservationData.notas}</div>
+                    </div>
+                </div>
+            ` : ''}
+            
+            <div class="summary-item border-top pt-3">
+                <div class="row">
+                    <div class="col-sm-4"><strong class="fs-5">Precio Total:</strong></div>
+                    <div class="col-sm-8"><strong class="fs-5 text-primary">€${reservationData.price.toFixed(2)}</strong></div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Confirm reservation
+    async function confirmReservation() {
+        const confirmBtn = document.getElementById('confirmReservation');
+        confirmBtn.innerHTML = '<span class="loading-spinner"></span> Confirmando...';
+        confirmBtn.disabled = true;
+
+        try {
+            const response = await fetch(`${SERVER_URL}/api/reservar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    fecha: reservationData.date,
+                    name: reservationData.name,
+                    phone: reservationData.phone,
+                    carBrand: reservationData.carBrand,
+                    carModel: reservationData.carModel,
+                    carSize: reservationData.carSize,
+                    price: reservationData.price,
+                    notas: reservationData.notas,
+                    services: reservationData.services
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                // Update final summary
+                document.getElementById('finalSummary').innerHTML = 
+                    document.getElementById('reservationSummary').innerHTML + 
+                    `<div class="alert alert-success mt-3">
+                        <strong>ID de Reserva:</strong> ${result.reserva.id}
+                    </div>`;
+
+                goToPage('success');
+                showNotification('¡Reserva confirmada exitosamente!', 'success');
+                
+                // Refresh spaces data
+                sincronizarEspaciosGlobal();
+            } else {
+                throw new Error(result.message || 'Error al confirmar la reserva');
+            }
+
+        } catch (error) {
+            console.error('Error confirmando reserva:', error);
+            showNotification('Error al confirmar la reserva: ' + error.message, 'danger');
+            confirmBtn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i> Confirmar Reserva';
+            confirmBtn.disabled = false;
+        }
+    }
+
+    function validatePersonalData() {
+        const name = document.getElementById('name').value.trim();
+        const phone = document.getElementById('phone').value.trim();
+        const carBrand = document.getElementById('car-brand').value.trim();
+        const carModel = document.getElementById('car-model').value.trim();
+        const carSize = document.getElementById('car-size').value;
+
+        const isValid = name && phone && carBrand && carModel && carSize;
+        document.getElementById('nextToPage3').disabled = !isValid;
+
+        if (isValid) {
+            reservationData.name = name;
+            reservationData.phone = phone;
+            reservationData.carBrand = carBrand;
+            reservationData.carModel = carModel;
+            reservationData.carSize = carSize;
+            reservationData.notas = document.getElementById('notas').value.trim();
+            updateProgress(60);
+        }
+    }
+
+    function resetReservation() {
+        reservationData = {
+            date: null,
+            name: '',
+            phone: '',
+            carBrand: '',
+            carModel: '',
+            carSize: '',
+            services: [],
+            serviceNames: [],
+            price: 0,
+            notas: ''
+        };
+        
+        selectedDate = null;
+        availableSpaces = 8;
+        isVerified = false;
+        currentPage = 1;
+        
+        // Reset form
+        document.getElementById('personalDataForm').reset();
+        document.getElementById('verificationCode').value = '';
+        
+        // Reset UI
+        document.querySelectorAll('.calendar-day.selected').forEach(day => {
+            day.classList.remove('selected');
+        });
+        
+        document.getElementById('selectedDateInfo').style.display = 'none';
+        document.getElementById('sendCodeSection').style.display = 'block';
+        document.getElementById('verifyCodeSection').style.display = 'none';
+        
+        goToPage(1);
+        sincronizarEspaciosGlobal();
+    }
+
+    // Enhanced calendar updates from global sync
+    function actualizarCalendarioConEspacios() {
+        if (document.getElementById('calendarDays')) {
+            renderCalendar();
+        }
+    }
+
+    // Event listeners setup
+    function setupEventListeners() {
+        // Calendar navigation
+        document.getElementById('prevMonth').addEventListener('click', () => changeMonth(-1));
+        document.getElementById('nextMonth').addEventListener('click', () => changeMonth(1));
+
+        // Page navigation
+        document.getElementById('nextToPage2').addEventListener('click', () => goToPage(2));
+        document.getElementById('prevToPage1').addEventListener('click', () => goToPage(1));
+        document.getElementById('nextToPage3').addEventListener('click', () => goToPage(3));
+        document.getElementById('prevToPage2').addEventListener('click', () => goToPage(2));
+        document.getElementById('nextToPage4').addEventListener('click', () => goToPage(4));
+        document.getElementById('prevToPage3').addEventListener('click', () => goToPage(3));
+        document.getElementById('nextToPage5').addEventListener('click', () => goToPage(5));
+        document.getElementById('prevToPage4').addEventListener('click', () => goToPage(4));
+
+        // Form validation
+        document.getElementById('personalDataForm').addEventListener('input', validatePersonalData);
+
+        // Phone verification
+        setupPhoneVerification();
+
+        // Confirmation
+        document.getElementById('confirmReservation').addEventListener('click', confirmReservation);
+
+        // New reservation
+        document.getElementById('newReservation').addEventListener('click', resetReservation);
+
+        // Navigation steps
+        document.querySelectorAll('.nav-step').forEach(step => {
+            step.addEventListener('click', function() {
+                const page = parseInt(this.dataset.page);
+                if (page <= currentPage + 1) { // Allow going to next page or any previous page
+                    goToPage(page);
+                }
+            });
+        });
+    }
+
+    // Initialize everything when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        setupEventListeners();
+        initializeCalendar();
+        updateNavigation();
+        
+        // Additional initialization from base template
+        console.log('🎯 Car Wash System initialized');
+    });
+</script>
+{% endblock %} 
