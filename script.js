@@ -95,6 +95,7 @@ const prevMonthBtn = document.getElementById('prevMonth');
 const nextMonthBtn = document.getElementById('nextMonth');
 const selectedDateElement = document.getElementById('selectedDate');
 const availableSpacesElement = document.getElementById('availableSpaces');
+const availableSpacesInfoElement = document.getElementById('availableSpacesInfo');
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', function() {
@@ -348,6 +349,11 @@ async function selectDate(date, dayElement) {
     availableSpaces = espaciosGlobales[fechaStr] || 8;
     availableSpacesElement.textContent = availableSpaces;
     
+    // Mostrar información de espacios disponibles
+    if (availableSpacesInfoElement) {
+        availableSpacesInfoElement.style.display = 'block';
+    }
+    
     // Quitar selección anterior
     document.querySelectorAll('.ios-calendar-day.selected').forEach(el => el.classList.remove('selected'));
     
@@ -496,7 +502,6 @@ function loadPricingSection() {
         <div class="pricing-grid">
             <div class="pricing-card">
                 <h3><i class="fas fa-car"></i> Servicios de Limpieza</h3>
-                <p class="card-subtitle">Elige un tipo de limpieza:</p>
                 <ul>
                     <li data-service="interior" data-price="${prices.interior}">Limpieza interior <strong>${prices.interior}€</strong></li>
                     <li data-service="exterior" data-price="${prices.exterior}">Limpieza exterior <strong>${prices.exterior}€</strong></li>
@@ -506,7 +511,6 @@ function loadPricingSection() {
             </div>
             <div class="pricing-card farol-card">
                 <h3><i class="fas fa-lightbulb"></i> Pulido de Faros (Opcional)</h3>
-                <p class="card-subtitle">✅ Elige solo UNO (se puede combinar con limpieza):</p>
                 <ul>
                     <li data-service="headlight-1" data-price="${PRICES.headlight['headlight-1']}">Un faro <strong>${PRICES.headlight['headlight-1']}€</strong></li>
                     <li data-service="headlight-2" data-price="${PRICES.headlight['headlight-2']}">Dos faros <strong>${PRICES.headlight['headlight-2']}€</strong></li>
@@ -516,7 +520,6 @@ function loadPricingSection() {
         
         <div class="notes-section">
             <h3><i class="fas fa-sticky-note"></i> Notas</h3>
-            <p class="notes-subtitle">¿Alguna información adicional sobre tu vehículo? (Opcional)</p>
             <textarea 
                 id="notasAdicionales" 
                 placeholder="Ej: Coche muy sucio, mancha difícil en el asiento, etc."
@@ -863,6 +866,12 @@ function handleNewReservation() {
         price: 0,
         notas: ''
     };
+    
+    // Resetear elementos de fecha
+    selectedDateElement.textContent = 'Ninguna';
+    if (availableSpacesInfoElement) {
+        availableSpacesInfoElement.style.display = 'none';
+    }
     
     // Limpiar formularios
     document.getElementById('personal-form').reset();

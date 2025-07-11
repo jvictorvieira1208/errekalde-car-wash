@@ -29,7 +29,7 @@ body {
     margin-bottom: 30px;
     box-shadow: 0 10px 30px rgba(30, 58, 138, 0.2);
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     flex-wrap: wrap;
     gap: 20px;
@@ -55,18 +55,7 @@ body {
     text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
-.swap-badge {
-    background: linear-gradient(45deg, #059669, #10b981);
-    color: white;
-    padding: 12px 20px;
-    border-radius: 25px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);
-    border: 1px solid rgba(255,255,255,0.2);
-}
+
 
 /* Navegación de páginas */
 .page-navigation {
@@ -313,6 +302,39 @@ body {
     margin-bottom: 10px;
     font-size: 1.3rem;
     font-weight: 600;
+    color: #ffffff !important;
+}
+
+/* Estilo mejorado para texto de espacios disponibles */
+.selected-date-info p {
+    color: #ffffff !important;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 8px 0 0 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+    opacity: 0.95;
+}
+
+/* Estilo específico para el número de espacios disponibles */
+.selected-date-info #availableSpaces {
+    color: #fbbf24 !important;
+    font-weight: 700;
+    font-size: 1.4rem;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-block;
+    position: relative;
+}
+
+/* Fallback para navegadores que no soportan background-clip */
+.selected-date-info #availableSpaces::before {
+    content: attr(data-number);
+    position: absolute;
+    color: #fbbf24;
+    z-index: -1;
 }
 
 /* Tarjetas de información */
@@ -537,6 +559,10 @@ body {
 .pricing-card.farol-card {
     background: linear-gradient(135deg, #fef3c7, #fefce8);
     border: 2px solid #fbbf24;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 280px;
 }
 
 .pricing-card.farol-card::before {
@@ -551,6 +577,20 @@ body {
     font-size: 0.7rem;
     font-weight: 600;
     box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+/* Centrar contenido específicamente en la tarjeta de faros */
+.pricing-card.farol-card h3 {
+    margin-bottom: 15px;
+    margin-top: 0;
+}
+
+.pricing-card.farol-card ul {
+    margin: auto 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
 }
 
 .pricing-card:hover {
@@ -1216,7 +1256,8 @@ body {
 
 #availableSpaces.updating {
     animation: pulse 0.5s ease-in-out;
-    color: #3b82f6;
+    color: #f59e0b;
+    text-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
 }
 
 
@@ -1343,10 +1384,7 @@ body {
         margin: 0;
     }
     
-    .swap-badge {
-        font-size: 0.85rem;
-        padding: 8px 16px;
-    }
+
     
     .page-navigation {
         flex-direction: row;
@@ -1567,10 +1605,7 @@ body {
         font-size: 1.7rem;
     }
     
-    .swap-badge {
-        font-size: 0.75rem;
-        padding: 6px 12px;
-    }
+
     
     .page-content {
         padding: 20px 15px;
@@ -1748,10 +1783,7 @@ body {
         font-size: 1.4rem;
     }
     
-    .swap-badge {
-        font-size: 0.7rem;
-        padding: 5px 10px;
-    }
+
     
     .page-navigation {
         flex-direction: row;
@@ -2003,10 +2035,7 @@ body {
         font-size: 1.2rem;
     }
     
-    .swap-badge {
-        font-size: 0.65rem;
-        padding: 4px 8px;
-    }
+
     
     .page-navigation {
         flex-direction: row;
@@ -2255,4 +2284,44 @@ body {
     .pricing-grid {
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     }
+} 
+
+/* =================
+   FUERZA ESTILOS ESPACIOS DISPONIBLES - CACHE BUSTER 2024
+   ================= */
+
+/* Estilos específicos para el texto "Espacios disponibles" con máxima especificidad */
+.container .page-content .selected-date-info p {
+    color: #ffffff !important;
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+    margin: 8px 0 0 0 !important;
+    text-shadow: 0 3px 6px rgba(0, 0, 0, 0.6) !important;
+    opacity: 1 !important;
+    background: none !important;
+    text-decoration: none !important;
+}
+
+/* Estilo específico para el número de espacios con máxima especificidad */
+.container .page-content .selected-date-info #availableSpaces {
+    color: #fbbf24 !important;
+    font-weight: 800 !important;
+    font-size: 1.5rem !important;
+    text-shadow: 0 3px 8px rgba(0, 0, 0, 0.7) !important;
+    background: none !important;
+    -webkit-text-fill-color: #fbbf24 !important;
+}
+
+/* Selector adicional para asegurar aplicación */
+div.selected-date-info p {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    text-shadow: 0 3px 6px rgba(0, 0, 0, 0.6) !important;
+}
+
+div.selected-date-info span#availableSpaces {
+    color: #fbbf24 !important;
+    font-weight: 800 !important;
+    font-size: 1.5rem !important;
+    text-shadow: 0 3px 8px rgba(0, 0, 0, 0.7) !important;
 } 
