@@ -794,62 +794,151 @@ function generateReservationSummary() {
     `;
 }
 
-// Confirmación de reserva con sincronización global
+// SISTEMA DE RESERVAS UNIVERSAL SINCRONIZADO
 async function handleConfirmReservation() {
+    console.log('🎯 INICIANDO RESERVA UNIVERSAL SINCRONIZADA');
+    
+    if (!selectedDate || !isVerified) {
+        showNotification('❌ Fecha no seleccionada o teléfono no verificado', 'error');
+        return;
+    }
+    
+    isReservationInProgress = true;
+    updateSyncStatus('sincronizando');
+    
     try {
-        // Preparar datos de reserva para el servidor
-        const reservaParaServidor = {
-            fecha: selectedDate.toISOString().split('T')[0],
-            ...reservationData
+        // 1. Verificar espacios disponibles en tiempo real
+        const fechaStr = selectedDate.toISOString().split('T')[0];
+        let espaciosActuales = espaciosGlobales[fechaStr] || 8;
+        
+        console.log(`📊 Espacios disponibles para ${fechaStr}: ${espaciosActuales}`);
+        
+        if (espaciosActuales <= 0) {
+            throw new Error('No hay espacios disponibles para esta fecha');
+        }
+        
+        // 2. Generar ID único de reserva
+        const reservationId = 'RES_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+        
+        // 3. Preparar datos completos de reserva
+        const reservaCompleta = {
+            // Identificación
+            id: reservationId,
+            timestamp: new Date().toISOString(),
+            
+            // Datos del cliente
+            name: reservationData.name,
+            phone: reservationData.phone,
+            
+            // Datos de la reserva
+            fecha: fechaStr,
+            vehicle: `${reservationData.carBrand} ${reservationData.carModel}`,
+            carBrand: reservationData.carBrand,
+            carModel: reservationData.carModel,
+            carSize: reservationData.carSize,
+            services: reservationData.services,
+            serviceNames: reservationData.serviceNames,
+            price: reservationData.price,
+            notas: reservationData.notas || '',
+            
+            // Datos de espacios
+            espaciosAntes: espaciosActuales,
+            espaciosDespues: espaciosActuales - 1,
+            
+            // Metadatos
+            device: navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop',
+            deviceId: generateDeviceId(),
+            source: IS_PRODUCTION ? 'production' : 'development'
         };
         
-        // Hacer reserva en el servidor (esta parte es crítica)
-        const resultadoReserva = await hacerReservaEnServidor(reservaParaServidor);
+        console.log('📋 Datos de reserva preparados:', reservaCompleta);
         
-        // Mostrar página de éxito inmediatamente (no depende del webhook)
-        pages.forEach(page => page.classList.remove('active'));
-        document.getElementById('success-page').classList.add('active');
+        // 4. ACTUALIZAR ESPACIOS INMEDIATAMENTE (Optimistic Update)
+        espaciosGlobales[fechaStr] = espaciosActuales - 1;
+        actualizarInterfazConEspacios();
         
-        // Generar resumen final
-        generateFinalSummary();
+        console.log(`🔄 Espacios actualizados localmente: ${fechaStr} = ${espaciosGlobales[fechaStr]}`);
+        showNotification(`🔄 Procesando reserva... Espacios restantes: ${espaciosGlobales[fechaStr]}`, 'info');
         
-        // Enviar confirmación a n8n (no bloquea el flujo si falla)
+        // 5. Enviar reserva al servidor
         try {
-            console.log('Intentando enviar WhatsApp...');
-            const webhookResult = await sendBookingConfirmation(reservationData);
+            const resultadoReserva = await hacerReservaEnServidor(reservaCompleta);
             
-            if (webhookResult.error || webhookResult.fallback) {
-                console.warn('Webhook falló pero reserva confirmada:', webhookResult.error || webhookResult.message);
+            if (resultadoReserva.success) {
+                console.log('✅ Reserva confirmada en servidor');
                 
-                // En dispositivos móviles, mostrar información más clara
-                if (IS_PRODUCTION) {
-                    showNotification(
-                        '✅ Reserva confirmada. El WhatsApp puede tardar unos minutos en llegar o puede haber fallado.', 
-                        'warning'
-                    );
+                // 6. Mostrar página de éxito
+                pages.forEach(page => page.classList.remove('active'));
+                document.getElementById('success-page').classList.add('active');
+                generateFinalSummary();
+                
+                // 7. Notificar éxito con espacios actualizados
+                showNotification(`✅ Reserva confirmada! Espacios restantes: ${espaciosGlobales[fechaStr]}`, 'success');
+                
+                // 8. Forzar sincronización universal en todos los dispositivos
+                setTimeout(async () => {
+                    console.log('📢 Forzando sincronización universal post-reserva');
+                    await sincronizarEspaciosUniversal();
+                }, 1000);
+                
+                // 9. Enviar WhatsApp (no bloquea el flujo)
+                try {
+                    console.log('📱 Enviando confirmación WhatsApp...');
+                    const webhookResult = await sendBookingConfirmation(reservationData);
+                    
+                    if (webhookResult.success) {
+                        console.log('✅ WhatsApp enviado exitosamente');
+                        showNotification('📱 Confirmación WhatsApp enviada', 'success');
+                    } else {
+                        console.warn('⚠️ WhatsApp falló:', webhookResult.error);
+                        showNotification('⚠️ Reserva confirmada. WhatsApp puede haber fallado.', 'warning');
+                    }
+                } catch (webhookError) {
+                    console.error('❌ Error en WhatsApp (no crítico):', webhookError);
+                    showNotification('✅ Reserva confirmada. WhatsApp pendiente.', 'warning');
                 }
+                
             } else {
-                console.log('WhatsApp enviado exitosamente');
-                
-                if (IS_PRODUCTION) {
-                    showNotification('✅ Reserva confirmada y WhatsApp enviado', 'success');
-                }
+                throw new Error(resultadoReserva.error || 'Error del servidor');
             }
-        } catch (webhookError) {
-            console.error('Error en webhook (no crítico):', webhookError);
             
-            // En dispositivos móviles, ser más claro sobre lo que pasó
-            if (IS_PRODUCTION) {
-                showNotification(
-                    '✅ Reserva confirmada. El WhatsApp de confirmación puede haber fallado, pero tu reserva está guardada.', 
-                    'warning'
-                );
+        } catch (serverError) {
+            console.error('❌ Error en servidor, manteniendo reserva local:', serverError);
+            
+            // Mantener la actualización local aunque falle el servidor
+            showNotification('⚠️ Reserva guardada localmente. Se sincronizará cuando haya conexión.', 'warning');
+            
+            // Guardar en localStorage para sincronización posterior
+            try {
+                const reservasOffline = JSON.parse(localStorage.getItem('reservas_offline') || '[]');
+                reservasOffline.push(reservaCompleta);
+                localStorage.setItem('reservas_offline', JSON.stringify(reservasOffline));
+                console.log('💾 Reserva guardada offline para sincronización posterior');
+            } catch (e) {
+                console.warn('⚠️ No se pudo guardar offline:', e);
             }
+            
+            // Mostrar página de éxito de todos modos
+            pages.forEach(page => page.classList.remove('active'));
+            document.getElementById('success-page').classList.add('active');
+            generateFinalSummary();
         }
         
     } catch (error) {
-        console.error('Error crítico confirmando reserva:', error);
+        console.error('❌ Error crítico en reserva:', error);
+        
+        // Revertir cambios si hay error crítico
+        const fechaStr = selectedDate.toISOString().split('T')[0];
+        if (espaciosGlobales[fechaStr] !== undefined) {
+            espaciosGlobales[fechaStr] = Math.min((espaciosGlobales[fechaStr] || 0) + 1, 8);
+            actualizarInterfazConEspacios();
+        }
+        
         showNotification(error.message || 'Error al confirmar la reserva', 'error');
+        
+    } finally {
+        isReservationInProgress = false;
+        updateSyncStatus('conectado');
     }
 }
 
@@ -1444,76 +1533,116 @@ async function guardarEspaciosEnN8N(espacios) {
 }
 
 // Función CRÍTICA: hacer reserva con sincronización inmediata
+// FUNCIÓN MEJORADA DE RESERVA UNIVERSAL
 async function hacerReservaEnServidor(reservaData) {
-    isReservationInProgress = true;
+    console.log('🎯 Procesando reserva universal con sincronización...');
+    console.log('📋 Datos recibidos:', reservaData);
     
     try {
-        console.log('🎯 Haciendo reserva con sincronización inmediata...');
-        
-        // PASO 1: Sincronizar datos ANTES de reservar
-        updateSyncStatus('sincronizando');
-        await sincronizarEspaciosGlobal();
-        
-        // PASO 2: Verificar disponibilidad en tiempo real
-        const fechaStr = reservaData.fecha;
-        const espaciosDisponibles = espaciosGlobales[fechaStr] || 8;
-        
-        if (espaciosDisponibles <= 0) {
-            throw new Error('No hay espacios disponibles para esta fecha');
-        }
-        
-        // PASO 3: Actualizar espacios INMEDIATAMENTE en N8N
-        const nuevosEspacios = { ...espaciosGlobales };
-        nuevosEspacios[fechaStr] = espaciosDisponibles - 1;
-        
-        // PASO 4: Guardar en N8N ANTES de continuar
-        const guardadoExitoso = await guardarEspaciosEnN8N(nuevosEspacios);
-        
-        if (!guardadoExitoso) {
-            throw new Error('Error al actualizar espacios en el servidor');
-        }
-        
-        // PASO 5: Actualizar datos locales
-        espaciosGlobales[fechaStr] = espaciosDisponibles - 1;
-        lastSpacesHash = JSON.stringify(espaciosGlobales);
-        
-        // PASO 6: Crear la reserva en N8N
-        const reservaCompleta = {
-            ...reservaData,
-            id: `RESERVA-${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            espacios_antes: espaciosDisponibles,
-            espacios_despues: espaciosDisponibles - 1,
-            device_id: generateDeviceId()
+        // PASO 1: Preparar payload completo para N8N (webhook que funciona)
+        const payloadCompleto = {
+            // Acción específica para reserva con actualización de espacios
+            action: 'universal_reservation_with_spaces_update',
+            
+            // Datos de la reserva
+            reservation: {
+                id: reservaData.id,
+                name: reservaData.name,
+                phone: reservaData.phone,
+                date: reservaData.fecha,
+                vehicle: reservaData.vehicle,
+                carBrand: reservaData.carBrand,
+                carModel: reservaData.carModel,
+                carSize: reservaData.carSize,
+                services: reservaData.services,
+                serviceNames: reservaData.serviceNames,
+                price: reservaData.price,
+                notes: reservaData.notas,
+                timestamp: reservaData.timestamp,
+                device: reservaData.device,
+                deviceId: reservaData.deviceId
+            },
+            
+            // Actualización de espacios
+            spacesUpdate: {
+                fecha: reservaData.fecha,
+                espaciosAntes: reservaData.espaciosAntes,
+                espaciosDespues: reservaData.espaciosDespues,
+                accion: 'reserva_universal'
+            },
+            
+            // Metadatos del sistema
+            system: {
+                timestamp: Date.now(),
+                source: reservaData.source,
+                version: 'universal_v1.0',
+                sync_required: true
+            }
         };
         
-        const resultadoReserva = await crearReservaEnN8N(reservaCompleta);
+        console.log('📡 Enviando reserva universal a N8N:', payloadCompleto);
         
-        if (resultadoReserva.success) {
-            // PASO 7: Actualizar interfaz inmediatamente
-            actualizarInterfazConEspacios();
+        // PASO 2: Enviar al webhook principal de N8N (que sabemos que funciona)
+        const response = await fetch(N8N_WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache',
+                'X-Reservation-Type': 'universal'
+            },
+            body: JSON.stringify(payloadCompleto)
+        });
+        
+        console.log('📥 Respuesta de N8N:', response.status, response.statusText);
+        
+        if (response.ok) {
+            const responseData = await response.json();
+            console.log('✅ Respuesta procesada:', responseData);
             
-            // PASO 8: Forzar sincronización inmediata para otros dispositivos
-            setTimeout(() => {
-                console.log('📢 Forzando sincronización global después de reserva');
-                sincronizarEspaciosGlobal();
-            }, 1000);
+            // PASO 3: Actualizar hash para sincronización
+            lastSpacesHash = JSON.stringify(espaciosGlobales);
             
-            console.log('✅ Reserva completada y sincronizada globalmente');
-            updateSyncStatus('conectado');
+            console.log('✅ Reserva universal procesada exitosamente');
             
-            return resultadoReserva;
+            return {
+                success: true,
+                reservationId: reservaData.id,
+                espaciosRestantes: reservaData.espaciosDespues,
+                responseData: responseData,
+                timestamp: new Date().toISOString()
+            };
             
         } else {
-            throw new Error(resultadoReserva.error || 'Error al crear la reserva');
+            // Intentar leer el error del servidor
+            let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            try {
+                const errorData = await response.text();
+                errorMessage += ` - ${errorData}`;
+            } catch (e) {
+                // Si no se puede leer el error, usar el mensaje por defecto
+            }
+            
+            throw new Error(errorMessage);
         }
         
     } catch (error) {
-        console.error('❌ Error en reserva:', error);
-        updateSyncStatus('desconectado');
+        console.error('❌ Error en reserva universal:', error);
+        
+        // Para errores de red o servidor, aún consideramos la reserva como exitosa
+        // ya que los espacios ya se actualizaron localmente
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            console.log('🌐 Error de red - reserva mantenida localmente');
+            return {
+                success: true,
+                reservationId: reservaData.id,
+                espaciosRestantes: reservaData.espaciosDespues,
+                offline: true,
+                message: 'Reserva guardada localmente - se sincronizará cuando haya conexión'
+            };
+        }
+        
+        // Para otros errores, relanzar
         throw error;
-    } finally {
-        isReservationInProgress = false;
     }
 }
 
@@ -1775,9 +1904,9 @@ window.diagnosticarSincronizacion = async function() {
     console.log('\n✅ Diagnóstico completado. Revisa los logs para detalles.');
 };
 
-// Mejorar inicialización con sincronización inicial más robusta
+// SISTEMA DE SINCRONIZACIÓN UNIVERSAL MEJORADO
 function inicializarSincronizacionAutomatica() {
-    console.log('🔄 Inicializando sistema de sincronización...');
+    console.log('🔄 Inicializando sistema de sincronización universal...');
     
     // Limpiar interval anterior si existe
     if (syncInterval) {
@@ -1788,28 +1917,36 @@ function inicializarSincronizacionAutomatica() {
     // Sincronización inicial inmediata
     setTimeout(async () => {
         console.log('🚀 Ejecutando sincronización inicial...');
-        await sincronizarEspaciosGlobal();
+        await sincronizarEspaciosUniversal();
         
-        // Configurar sincronización automática después de la inicial
+        // Configurar sincronización automática más agresiva para reservas
         syncInterval = setInterval(async () => {
-            await sincronizarEspaciosGlobal();
-        }, 3000);
+            await sincronizarEspaciosUniversal();
+        }, 2000); // Cada 2 segundos para mayor responsividad
         
-        console.log('✅ Sincronización automática configurada (cada 3 segundos)');
+        console.log('✅ Sincronización universal configurada (cada 2 segundos)');
     }, 1000);
     
     // Sincronización cuando la ventana recibe foco
     window.addEventListener('focus', () => {
         console.log('🔄 Ventana con foco, sincronizando...');
-        setTimeout(sincronizarEspaciosGlobal, 500);
+        setTimeout(sincronizarEspaciosUniversal, 300);
     });
     
     // Sincronización cuando la página se vuelve visible
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
             console.log('🔄 Página visible, sincronizando...');
-            setTimeout(sincronizarEspaciosGlobal, 500);
+            setTimeout(sincronizarEspaciosUniversal, 300);
         }
+    });
+    
+    // Sincronización cuando hay cambio de red
+    window.addEventListener('online', () => {
+        console.log('🌐 Conexión restaurada, sincronizando...');
+        setTimeout(sincronizarEspaciosUniversal, 500);
+        // También sincronizar reservas offline
+        setTimeout(sincronizarReservasOffline, 1000);
     });
     
     // Añadir función de diagnóstico al objeto window
@@ -1817,7 +1954,118 @@ function inicializarSincronizacionAutomatica() {
         console.log('🔧 Función de diagnóstico disponible: diagnosticarSincronizacion()');
     }
     
-    console.log('✅ Sistema de sincronización inicializado');
+    console.log('✅ Sistema de sincronización universal inicializado');
+}
+
+// FUNCIÓN DE SINCRONIZACIÓN UNIVERSAL PARA RESERVAS
+async function sincronizarEspaciosUniversal() {
+    if (isReservationInProgress) {
+        console.log('⏸️ Reserva en progreso, saltando sincronización');
+        return;
+    }
+
+    try {
+        console.log('🔄 Sincronización universal de espacios...');
+        updateSyncStatus('sincronizando');
+        
+        // PASO 1: Solicitar espacios actuales usando el webhook que funciona
+        const payload = {
+            action: 'get_universal_spaces',
+            timestamp: Date.now(),
+            cache_buster: 'UNIVERSAL_' + Date.now(),
+            source: IS_PRODUCTION ? 'production' : 'development',
+            device_id: generateDeviceId()
+        };
+        
+        const response = await fetch(N8N_WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache',
+                'X-Sync-Type': 'universal'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('📦 Respuesta universal:', data);
+            
+            // PASO 2: Verificar si hay espacios actualizados en la respuesta
+            let espaciosActualizados = null;
+            
+            // Buscar espacios en diferentes formatos de respuesta
+            if (data && data.espacios && typeof data.espacios === 'object') {
+                espaciosActualizados = data.espacios;
+            } else if (data && data.spaces && typeof data.spaces === 'object') {
+                espaciosActualizados = data.spaces;
+            } else if (data && data.data && data.data.espacios) {
+                espaciosActualizados = data.data.espacios;
+            }
+            
+            // PASO 3: Si no hay datos de espacios en N8N, usar los datos locales actuales
+            if (!espaciosActualizados) {
+                console.log('ℹ️ N8N no devolvió espacios, manteniendo datos locales');
+                espaciosActualizados = espaciosGlobales;
+            }
+            
+            // PASO 4: Detectar y aplicar cambios
+            const newHash = JSON.stringify(espaciosActualizados);
+            const hasChanges = newHash !== lastSpacesHash;
+            
+            if (hasChanges) {
+                console.log('🔄 Cambios detectados en espacios universales');
+                
+                // Detectar cambios específicos
+                const espaciosAnteriores = { ...espaciosGlobales };
+                espaciosGlobales = espaciosActualizados;
+                
+                // Mostrar qué cambió
+                Object.keys(espaciosActualizados).forEach(fecha => {
+                    if (espaciosAnteriores[fecha] !== espaciosActualizados[fecha]) {
+                        console.log(`📅 ${fecha}: ${espaciosAnteriores[fecha] || 8} → ${espaciosActualizados[fecha]}`);
+                    }
+                });
+                
+                // Actualizar interfaz
+                actualizarInterfazConEspacios();
+                lastSpacesHash = newHash;
+                
+                showNotification('🔄 Espacios actualizados desde otro dispositivo', 'info');
+            } else {
+                console.log('ℹ️ Sin cambios en espacios universales');
+            }
+            
+            lastSyncTime = new Date();
+            updateSyncStatus('conectado');
+            syncRetryCount = 0;
+            
+        } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en sincronización universal:', error);
+        syncRetryCount++;
+        
+        if (syncRetryCount <= MAX_SYNC_RETRIES) {
+            updateSyncStatus('reintentando');
+            
+            const retryDelay = Math.min(3000 * Math.pow(2, syncRetryCount - 1), 15000);
+            setTimeout(() => {
+                console.log(`🔄 Reintentando sincronización en ${retryDelay/1000}s...`);
+                sincronizarEspaciosUniversal();
+            }, retryDelay);
+        } else {
+            updateSyncStatus('desconectado');
+            
+            // Reset después de 30 segundos en lugar de 60
+            setTimeout(() => {
+                syncRetryCount = 0;
+                console.log('🔄 Reiniciando contador de reintentos');
+            }, 30000);
+        }
+    }
 }
 
 // Inicializar espacios en el servidor
@@ -1885,6 +2133,88 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('✅ Sistema iniciado correctamente con sincronización universal');
 });
+
+// FUNCIÓN PARA SINCRONIZAR RESERVAS OFFLINE
+async function sincronizarReservasOffline() {
+    try {
+        const reservasOffline = JSON.parse(localStorage.getItem('reservas_offline') || '[]');
+        
+        if (reservasOffline.length === 0) {
+            console.log('ℹ️ No hay reservas offline para sincronizar');
+            return;
+        }
+        
+        console.log(`🔄 Sincronizando ${reservasOffline.length} reservas offline...`);
+        
+        const reservasSincronizadas = [];
+        const reservasFallidas = [];
+        
+        for (const reserva of reservasOffline) {
+            try {
+                console.log(`📤 Sincronizando reserva offline: ${reserva.id}`);
+                
+                const resultado = await hacerReservaEnServidor(reserva);
+                
+                if (resultado.success) {
+                    reservasSincronizadas.push(reserva);
+                    console.log(`✅ Reserva sincronizada: ${reserva.id}`);
+                } else {
+                    reservasFallidas.push(reserva);
+                    console.warn(`⚠️ Falló sincronización: ${reserva.id}`);
+                }
+                
+            } catch (error) {
+                console.error(`❌ Error sincronizando reserva ${reserva.id}:`, error);
+                reservasFallidas.push(reserva);
+            }
+        }
+        
+        // Actualizar localStorage solo con las reservas que fallaron
+        localStorage.setItem('reservas_offline', JSON.stringify(reservasFallidas));
+        
+        if (reservasSincronizadas.length > 0) {
+            showNotification(`✅ ${reservasSincronizadas.length} reservas offline sincronizadas`, 'success');
+        }
+        
+        if (reservasFallidas.length > 0) {
+            showNotification(`⚠️ ${reservasFallidas.length} reservas pendientes de sincronización`, 'warning');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en sincronización de reservas offline:', error);
+    }
+}
+
+// FUNCIÓN PARA MOSTRAR ESTADÍSTICAS DE RESERVAS
+window.mostrarEstadisticasReservas = function() {
+    const reservasOffline = JSON.parse(localStorage.getItem('reservas_offline') || '[]');
+    const totalEspacios = Object.keys(espaciosGlobales).length;
+    const espaciosOcupados = Object.values(espaciosGlobales).reduce((total, espacios) => total + (8 - espacios), 0);
+    
+    console.log('📊 ESTADÍSTICAS DE RESERVAS');
+    console.log('═'.repeat(50));
+    console.log(`📅 Fechas disponibles: ${totalEspacios}`);
+    console.log(`🚗 Espacios ocupados: ${espaciosOcupados}`);
+    console.log(`💾 Reservas offline pendientes: ${reservasOffline.length}`);
+    console.log(`🕐 Última sincronización: ${lastSyncTime ? lastSyncTime.toLocaleString() : 'Nunca'}`);
+    console.log(`📡 Estado: ${syncStatus}`);
+    console.log('═'.repeat(50));
+    
+    if (reservasOffline.length > 0) {
+        console.log('📋 Reservas offline pendientes:');
+        reservasOffline.forEach(reserva => {
+            console.log(`   • ${reserva.id} - ${reserva.name} - ${reserva.fecha}`);
+        });
+    }
+    
+    return {
+        fechasDisponibles: totalEspacios,
+        espaciosOcupados: espaciosOcupados,
+        reservasOffline: reservasOffline.length,
+        ultimaSync: lastSyncTime,
+        estado: syncStatus
+    };
+};
 
 // Exportar funciones para testing
 if (typeof module !== 'undefined' && module.exports) {
