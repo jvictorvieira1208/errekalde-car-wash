@@ -52,14 +52,15 @@ const N8N_VALIDATION_URL = 'https://n8nserver.swapenergia.com/webhook/validarNú
 const N8N_SYNC_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash-sync';
 const N8N_SPACES_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash'; // USAR EL QUE FUNCIONA
 
-// Detección automática de entorno - SIEMPRE usar sincronización N8N
+// Detección automática de entorno - Backend centralizado + N8N fallback
 function getServerUrl() {
-    // Para desarrollo local, usar servidor local como fallback
+    // Para desarrollo local, usar servidor local
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         return 'http://localhost:3001';
     }
-    // Para producción, usar N8N directamente
-    return null;
+    // Para producción, usar backend desplegado en Render
+    // IMPORTANTE: Cambiar esta URL cuando despliegues tu backend
+    return 'https://errekalde-car-wash-backend.onrender.com';
 }
 
 // Variables globales
@@ -130,17 +131,25 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeCalendar();
     updateNavigation();
     
-    // NUEVO: Detectar desincronización antes de inicializar
+    // ARREGLADO: Inicializar sincronización SIEMPRE
     setTimeout(async () => {
         console.log('🔍 Verificando sincronización entre dispositivos...');
         
-        // Detectar si hay desincronización
-        const hayDesincronizacion = await detectarDesincronizacion();
+        // SIEMPRE inicializar la sincronización, independientemente del estado inicial
+        console.log('🚀 Iniciando sincronización automática FORZADA...');
+        inicializarSincronizacionAutomatica();
+        inicializarEspaciosEnServidor();
         
-        if (!hayDesincronizacion) {
-            // Inicializar sistema de sincronización normal
-            inicializarSincronizacionAutomatica();
-            inicializarEspaciosEnServidor();
+        // Detectar si hay desincronización para reporte (no bloquea inicialización)
+        try {
+            const hayDesincronizacion = await detectarDesincronizacion();
+            if (hayDesincronizacion) {
+                console.log('⚠️ Desincronización detectada, pero sincronización ya iniciada');
+            } else {
+                console.log('✅ Dispositivos sincronizados correctamente');
+            }
+        } catch (error) {
+            console.log('ℹ️ No se pudo verificar desincronización inicial, pero sincronización ya iniciada');
         }
         
         // Configurar detección automática cada 30 segundos
@@ -1539,7 +1548,48 @@ async function hacerReservaEnServidor(reservaData) {
     console.log('📋 Datos recibidos:', reservaData);
     
     try {
-        // PASO 1: Preparar payload completo para N8N (webhook que funciona)
+        // PASO 1: Intentar backend centralizado PRIMERO
+        if (SERVER_URL) {
+            try {
+                console.log('🌐 Enviando reserva a backend centralizado:', SERVER_URL);
+                const backendResponse = await fetch(`${SERVER_URL}/api/reservar`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    },
+                    body: JSON.stringify({
+                        fecha: reservaData.fecha,
+                        name: reservaData.name,
+                        phone: reservaData.phone,
+                        carBrand: reservaData.carBrand,
+                        carModel: reservaData.carModel,
+                        carSize: reservaData.carSize,
+                        services: reservaData.services,
+                        price: reservaData.price,
+                        notas: reservaData.notas || ''
+                    })
+                });
+                
+                if (backendResponse.ok) {
+                    const backendData = await backendResponse.json();
+                    if (backendData.success) {
+                        console.log('✅ Reserva creada exitosamente en backend centralizado');
+                        // Actualizar espacios locales inmediatamente
+                        if (espaciosGlobales[reservaData.fecha]) {
+                            espaciosGlobales[reservaData.fecha] = Math.max(0, espaciosGlobales[reservaData.fecha] - 1);
+                        }
+                        return backendData;
+                    }
+                }
+            } catch (backendError) {
+                console.log('⚠️ Backend centralizado no disponible para reservas, intentando N8N...');
+            }
+        }
+        
+        // PASO 2: Fallback a N8N si backend no responde
+        console.log('📤 Enviando reserva a N8N (fallback)...');
+        // PASO 2.1: Preparar payload completo para N8N (webhook que funciona)
         const payloadCompleto = {
             // Acción específica para reserva con actualización de espacios
             action: 'universal_reservation_with_spaces_update',
@@ -1959,16 +2009,42 @@ function inicializarSincronizacionAutomatica() {
 
 // FUNCIÓN DE SINCRONIZACIÓN UNIVERSAL PARA RESERVAS
 async function sincronizarEspaciosUniversal() {
-    if (isReservationInProgress) {
-        console.log('⏸️ Reserva en progreso, saltando sincronización');
-        return;
-    }
-
+    // ARREGLADO: Eliminar bloqueo que impedía sincronización
+    // La sincronización debe funcionar SIEMPRE para mantener dispositivos actualizados
+    
     try {
-        console.log('🔄 Sincronización universal de espacios...');
+        console.log('🔄 SINCRONIZACIÓN SÚPER ROBUSTA ACTIVADA...');
         updateSyncStatus('sincronizando');
         
-        // PASO 1: Solicitar espacios actuales usando el webhook que funciona
+        // PASO 1: Intentar backend centralizado PRIMERO
+        if (SERVER_URL) {
+            try {
+                console.log('🌐 Intentando backend centralizado:', SERVER_URL);
+                const backendResponse = await fetch(`${SERVER_URL}/api/sync-espacios`, {
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'X-Sync-Type': 'universal'
+                    }
+                });
+                
+                if (backendResponse.ok) {
+                    const backendData = await backendResponse.json();
+                    if (backendData.espacios) {
+                        console.log('✅ Sincronización exitosa con backend centralizado');
+                        espaciosGlobales = backendData.espacios;
+                        actualizarInterfazConEspacios();
+                        updateSyncStatus('conectado');
+                        lastSyncTime = Date.now();
+                        return;
+                    }
+                }
+            } catch (backendError) {
+                console.log('⚠️ Backend centralizado no disponible, intentando N8N...');
+            }
+        }
+        
+        // PASO 2: Fallback a N8N si backend no responde
         const payload = {
             action: 'get_universal_spaces',
             timestamp: Date.now(),

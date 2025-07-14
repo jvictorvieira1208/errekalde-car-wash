@@ -1,0 +1,46 @@
+# env-example.txt - Variables de entorno para Errekalde Car Wash
+# Copia este contenido a un archivo .env en producción
+
+# === CONFIGURACIÓN DE BASE DE DATOS ===
+
+# Tipo de base de datos: 'postgresql' (producción) o 'mysql' (desarrollo)
+DB_TYPE=postgresql
+
+# === POSTGRESQL (RENDER.COM) ===
+# URL completa de PostgreSQL proporcionada por Render
+DATABASE_URL=postgresql://username:password@hostname:port/database
+
+# === MYSQL/MARIADB (DESARROLLO LOCAL) ===
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=errekalde_car_wash
+DB_CONNECTION_LIMIT=10
+
+# === CONFIGURACIÓN DEL SERVIDOR ===
+NODE_ENV=production
+PORT=3001
+
+# === CONFIGURACIÓN DE CORS ===
+# URLs permitidas para CORS (separadas por comas)
+ALLOWED_ORIGINS=https://errekalde-car-wash.surge.sh,http://localhost:8080
+
+# === CONFIGURACIÓN N8N (OPCIONAL) ===
+N8N_WEBHOOK_URL=https://n8nserver.swapenergia.com/webhook/errekaldecarwash
+N8N_VALIDATION_URL=https://n8nserver.swapenergia.com/webhook/validarNúmero
+
+# === CONFIGURACIÓN DE WHATSAPP (OPCIONAL) ===
+WHATSAPP_PHONE_NUMBER=+34XXXXXXXXX
+WHATSAPP_BUSINESS_ACCOUNT=swap-energia
+
+# === CONFIGURACIÓN DE LOGS ===
+LOG_LEVEL=info
+LOG_FILE=errekalde-car-wash.log
+
+# === CONFIGURACIÓN DE SEGURIDAD ===
+# Clave secreta para JWT (si se implementa autenticación)
+JWT_SECRET=your-super-secret-jwt-key-here
+
+# === CONFIGURACIÓN DE TIMEZONE ===
+TZ=Europe/Madrid 
