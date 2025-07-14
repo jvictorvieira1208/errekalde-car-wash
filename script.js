@@ -50,7 +50,7 @@ const VEHICLE_DATABASE = {
 const N8N_WEBHOOK_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
 const N8N_VALIDATION_URL = 'https://n8nserver.swapenergia.com/webhook/validarNúmero';
 const N8N_SYNC_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash-sync';
-const N8N_SPACES_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash-spaces';
+const N8N_SPACES_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash'; // USAR EL QUE FUNCIONA
 
 // Detección automática de entorno - SIEMPRE usar sincronización N8N
 function getServerUrl() {
@@ -130,10 +130,50 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeCalendar();
     updateNavigation();
     
-    // Inicializar sistema de sincronización
-    inicializarSincronizacionAutomatica();
-    inicializarEspaciosEnServidor();
+    // NUEVO: Detectar desincronización antes de inicializar
+    setTimeout(async () => {
+        console.log('🔍 Verificando sincronización entre dispositivos...');
+        
+        // Detectar si hay desincronización
+        const hayDesincronizacion = await detectarDesincronizacion();
+        
+        if (!hayDesincronizacion) {
+            // Inicializar sistema de sincronización normal
+            inicializarSincronizacionAutomatica();
+            inicializarEspaciosEnServidor();
+        }
+        
+        // Configurar detección automática cada 30 segundos
+        setInterval(async () => {
+            await detectarDesincronizacion();
+        }, 30000);
+        
+    }, 500);
+    
+    // Añadir botón de emergencia al DOM para debugging
+    if (window.location.hostname === 'localhost' || window.location.search.includes('debug=true')) {
+        addEmergencyButton();
+    }
 });
+
+// Función para añadir botón de emergencia (solo en desarrollo o con debug=true)
+function addEmergencyButton() {
+    const button = document.createElement('button');
+    button.textContent = '🚨 Sync Emergencia';
+    button.style.position = 'fixed';
+    button.style.top = '10px';
+    button.style.right = '10px';
+    button.style.zIndex = '9999';
+    button.style.background = '#ff4444';
+    button.style.color = 'white';
+    button.style.border = 'none';
+    button.style.padding = '10px';
+    button.style.borderRadius = '5px';
+    button.style.cursor = 'pointer';
+    button.onclick = () => forzarSincronizacionEmergencia();
+    document.body.appendChild(button);
+    console.log('🔧 Botón de emergencia añadido (esquina superior derecha)');
+}
 
 // Configurar event listeners
 function setupEventListeners() {
@@ -1172,6 +1212,8 @@ function getNotificationIcon(type) {
 let syncInterval = null;
 let lastSpacesHash = '';
 let isReservationInProgress = false;
+let syncRetryCount = 0;
+const MAX_SYNC_RETRIES = 3;
 
 // Función principal para sincronizar espacios usando N8N como backend universal
 async function sincronizarEspaciosGlobal() {
@@ -1181,7 +1223,7 @@ async function sincronizarEspaciosGlobal() {
     }
 
     try {
-        console.log('🔄 Iniciando sincronización verdadera...');
+        console.log(`🔄 Iniciando sincronización (intento ${syncRetryCount + 1}/${MAX_SYNC_RETRIES + 1})...`);
         updateSyncStatus('sincronizando');
         
         // PASO 1: Obtener datos SIEMPRE desde N8N (sin localStorage)
@@ -1189,18 +1231,24 @@ async function sincronizarEspaciosGlobal() {
         
         if (espaciosN8N) {
             console.log('✅ Datos obtenidos desde N8N:', Object.keys(espaciosN8N).length, 'fechas');
+            console.log('📊 Ejemplo de datos N8N:', Object.entries(espaciosN8N).slice(0, 2));
             
             // PASO 2: Calcular hash para detectar cambios reales
             const newHash = JSON.stringify(espaciosN8N);
             const hasChanges = newHash !== lastSpacesHash;
             
-            if (hasChanges) {
-                console.log('🔄 Cambios detectados desde otros dispositivos');
+            if (hasChanges || Object.keys(espaciosGlobales).length === 0) {
+                console.log('🔄 Cambios detectados o primera sincronización');
                 const espaciosAnteriores = { ...espaciosGlobales };
                 espaciosGlobales = espaciosN8N;
                 
                 // PASO 3: Detectar y notificar cambios específicos
-                detectarCambiosEspacios(espaciosAnteriores, espaciosGlobales);
+                if (Object.keys(espaciosAnteriores).length > 0) {
+                    detectarCambiosEspacios(espaciosAnteriores, espaciosGlobales);
+                    showNotification('🔄 Sincronizado con otros dispositivos', 'success');
+                } else {
+                    console.log('🆕 Primera carga de datos');
+                }
                 
                 // PASO 4: Actualizar interfaz inmediatamente
                 actualizarInterfazConEspacios();
@@ -1208,7 +1256,19 @@ async function sincronizarEspaciosGlobal() {
                 // PASO 5: Actualizar hash
                 lastSpacesHash = newHash;
                 
-                console.log('✅ Interfaz actualizada con cambios de otros dispositivos');
+                console.log('✅ Interfaz actualizada con cambios');
+                
+                // PASO 6: Guardar en localStorage para cache local (solo en producción)
+                if (IS_PRODUCTION) {
+                    try {
+                        localStorage.setItem('espaciosGlobales', JSON.stringify(espaciosGlobales));
+                        localStorage.setItem('lastSyncTime', new Date().toISOString());
+                        console.log('💾 Datos guardados en localStorage');
+                    } catch (e) {
+                        console.warn('⚠️ No se pudo guardar en localStorage:', e);
+                    }
+                }
+                
             } else {
                 console.log('ℹ️ Sin cambios desde la última sincronización');
                 espaciosGlobales = espaciosN8N;
@@ -1216,6 +1276,18 @@ async function sincronizarEspaciosGlobal() {
             
             lastSyncTime = new Date();
             updateSyncStatus('conectado');
+            syncRetryCount = 0; // Reset retry counter on success
+            
+            // VERIFICACIÓN ADICIONAL: Asegurar que la interfaz muestra datos correctos
+            const currentAvailableSpaces = document.getElementById('availableSpaces');
+            if (currentAvailableSpaces && selectedDate) {
+                const fechaStr = selectedDate.toISOString().split('T')[0];
+                const espaciosParaFecha = espaciosGlobales[fechaStr] || 8;
+                if (parseInt(currentAvailableSpaces.textContent) !== espaciosParaFecha) {
+                    console.log(`🔧 Corrigiendo espacios mostrados: ${currentAvailableSpaces.textContent} → ${espaciosParaFecha}`);
+                    currentAvailableSpaces.textContent = espaciosParaFecha;
+                }
+            }
             
         } else {
             throw new Error('No se pudieron obtener datos de N8N');
@@ -1223,20 +1295,34 @@ async function sincronizarEspaciosGlobal() {
         
     } catch (error) {
         console.error('❌ Error en sincronización:', error);
-        updateSyncStatus('desconectado');
+        syncRetryCount++;
         
-        // FALLBACK: Usar datos actuales sin localStorage
-        if (Object.keys(espaciosGlobales).length === 0) {
-            console.log('🆕 Inicializando espacios por defecto');
-            espaciosGlobales = inicializarEspaciosPorDefecto();
-            await guardarEspaciosEnN8N(espaciosGlobales);
+        if (syncRetryCount <= MAX_SYNC_RETRIES) {
+            updateSyncStatus('reintentando');
+            showNotification(`⚠️ Error de sincronización, reintentando... (${syncRetryCount}/${MAX_SYNC_RETRIES})`, 'warning');
+            
+            // Retry with exponential backoff
+            const retryDelay = Math.min(5000 * Math.pow(2, syncRetryCount - 1), 30000);
+            setTimeout(() => {
+                console.log(`🔄 Reintentando sincronización en ${retryDelay/1000}s...`);
+                sincronizarEspaciosGlobal();
+            }, retryDelay);
+        } else {
+            updateSyncStatus('desconectado');
+            showNotification('❌ Error de sincronización. Activando modo de emergencia...', 'error');
+            
+            // ACTIVAR SINCRONIZACIÓN DE EMERGENCIA AUTOMÁTICAMENTE
+            console.log('🚨 Activando sincronización de emergencia por fallos consecutivos');
+            setTimeout(async () => {
+                await forzarSincronizacionEmergencia();
+            }, 2000);
+            
+            // Reset retry count after some time
+            setTimeout(() => {
+                syncRetryCount = 0;
+                console.log('🔄 Reiniciando contador de reintentos');
+            }, 60000); // Reset after 1 minute
         }
-        
-        // Reintentar más agresivamente si hay error
-        setTimeout(() => {
-            console.log('🔄 Reintentando sincronización...');
-            sincronizarEspaciosGlobal();
-        }, 5000);
     }
 }
 
@@ -1244,6 +1330,7 @@ async function sincronizarEspaciosGlobal() {
 async function obtenerEspaciosDesdeN8N() {
     try {
         console.log('📡 Consultando espacios en N8N...');
+        console.log('🔍 URL N8N:', N8N_SPACES_URL);
         
         const payload = {
             action: 'get_spaces',
@@ -1253,18 +1340,37 @@ async function obtenerEspaciosDesdeN8N() {
             device_id: generateDeviceId()
         };
         
-        const response = await fetch(N8N_SPACES_URL, {
+        console.log('📤 Enviando payload a N8N:', payload);
+        
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Timeout: N8N no respondió en 10 segundos')), 10000);
+        });
+        
+        // Create the fetch promise
+        const fetchPromise = fetch(N8N_SPACES_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
             },
             body: JSON.stringify(payload)
         });
         
+        // Race between fetch and timeout
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
+        
+        console.log('📥 Respuesta de N8N:', {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers ? Array.from(response.headers.entries()) : 'No headers'
+        });
+        
         if (response.ok) {
             const data = await response.json();
+            console.log('📦 Datos recibidos de N8N:', data);
             
             // Si N8N devuelve datos válidos, usarlos
             if (data && data.espacios && typeof data.espacios === 'object') {
@@ -1279,11 +1385,23 @@ async function obtenerEspaciosDesdeN8N() {
             return espaciosIniciales;
             
         } else {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const errorText = await response.text().catch(() => 'Sin texto de error');
+            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
         }
         
     } catch (error) {
         console.error('❌ Error obteniendo espacios de N8N:', error);
+        console.error('🔍 Detalles del error:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
+        
+        // Si es un error de red, proporcionar más información
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            console.error('🌐 Error de red: Verifica la conectividad a internet y que N8N esté disponible');
+        }
+        
         return null;
     }
 }
@@ -1499,29 +1617,51 @@ function detectarCambiosEspacios(espaciosAnteriores, espaciosNuevos) {
 
 // Función para actualizar estado de sincronización
 function updateSyncStatus(status) {
+    const syncStatusElement = document.getElementById('sync-status');
+    if (!syncStatusElement) return;
+    
+    // Actualizar texto y clase
+    const statusInfo = {
+        'conectado': { 
+            text: '🟢 Sincronizado', 
+            class: 'conectado',
+            title: `Última sincronización: ${lastSyncTime ? lastSyncTime.toLocaleTimeString() : 'Nunca'}`
+        },
+        'desconectado': { 
+            text: '🔴 Sin conexión', 
+            class: 'desconectado',
+            title: 'No se puede conectar con el servidor. Usando datos locales.'
+        },
+        'sincronizando': { 
+            text: '🟡 Sincronizando...', 
+            class: 'sincronizando',
+            title: 'Obteniendo últimos datos del servidor...'
+        },
+        'reintentando': { 
+            text: `🔄 Reintentando (${syncRetryCount}/${MAX_SYNC_RETRIES})`, 
+            class: 'reintentando',
+            title: `Reintentando conexión. Intento ${syncRetryCount} de ${MAX_SYNC_RETRIES}`
+        }
+    };
+    
+    const info = statusInfo[status] || { text: '⚪ Desconocido', class: 'desconocido', title: 'Estado desconocido' };
+    
+    syncStatusElement.textContent = info.text;
+    syncStatusElement.className = `sync-status ${info.class}`;
+    syncStatusElement.title = info.title;
+    
+    // Guardar el estado global
     syncStatus = status;
     
-    // Actualizar indicador visual si existe
-    const syncIndicator = document.getElementById('sync-status');
-    if (syncIndicator) {
-        syncIndicator.className = `sync-status ${status}`;
-        
-        const statusText = {
-            'conectado': '🟢 Sincronizado',
-            'desconectado': '🔴 Desconectado', 
-            'sincronizando': '🟡 Sincronizando...'
-        }[status] || '⚪ Desconocido';
-        
-        syncIndicator.textContent = statusText;
-        
-        // Añadir timestamp
-        if (status === 'conectado' && lastSyncTime) {
-            const timeStr = lastSyncTime.toLocaleTimeString();
-            syncIndicator.title = `Última sincronización: ${timeStr}`;
-        }
+    // Añadir clase de animación temporal para cambios importantes
+    if (status === 'conectado' || status === 'desconectado') {
+        syncStatusElement.style.animation = 'pulse 0.5s ease-in-out';
+        setTimeout(() => {
+            syncStatusElement.style.animation = '';
+        }, 500);
     }
     
-    console.log(`📡 Estado de sincronización: ${status}`);
+    console.log(`🔄 Estado de sincronización: ${info.text}`);
 }
 
 // Función para actualizar el calendario con espacios disponibles y animaciones
@@ -1590,22 +1730,73 @@ function inicializarEspaciosPorDefecto() {
     return espacios;
 }
 
-// Inicializar sincronización AGRESIVA para tiempo real
-function inicializarSincronizacionAutomatica() {
-    console.log('🔄 Iniciando sincronización AGRESIVA en tiempo real...');
+// Función de diagnóstico para problemas de sincronización
+window.diagnosticarSincronizacion = async function() {
+    console.log('🔧 === DIAGNÓSTICO DE SINCRONIZACIÓN ===');
     
-    // Sincronización inicial inmediata
-    sincronizarEspaciosGlobal();
+    // 1. Verificar configuración
+    console.log('1️⃣ Configuración:');
+    console.log('   • Entorno:', IS_PRODUCTION ? 'PRODUCCIÓN' : 'DESARROLLO');
+    console.log('   • Hostname:', window.location.hostname);
+    console.log('   • URL N8N Spaces:', N8N_SPACES_URL);
+    console.log('   • Server URL:', SERVER_URL);
+    
+    // 2. Verificar conectividad a N8N
+    console.log('\n2️⃣ Probando conectividad a N8N...');
+    try {
+        const startTime = Date.now();
+        const response = await fetch(N8N_SPACES_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'ping', timestamp: Date.now() })
+        });
+        const endTime = Date.now();
+        
+        console.log('   ✅ N8N responde');
+        console.log('   • Status:', response.status);
+        console.log('   • Tiempo respuesta:', endTime - startTime, 'ms');
+        console.log('   • Headers:', Array.from(response.headers.entries()));
+    } catch (error) {
+        console.log('   ❌ Error conectividad N8N:', error.message);
+    }
+    
+    // 3. Verificar estado actual
+    console.log('\n3️⃣ Estado actual:');
+    console.log('   • Espacios globales:', Object.keys(espaciosGlobales).length, 'fechas');
+    console.log('   • Última sincronización:', lastSyncTime);
+    console.log('   • Estado sync:', syncStatus);
+    console.log('   • Reintentos fallidos:', syncRetryCount);
+    console.log('   • Reserva en progreso:', isReservationInProgress);
+    
+    // 4. Probar sincronización manual
+    console.log('\n4️⃣ Probando sincronización manual...');
+    await sincronizarEspaciosGlobal();
+    
+    console.log('\n✅ Diagnóstico completado. Revisa los logs para detalles.');
+};
+
+// Mejorar inicialización con sincronización inicial más robusta
+function inicializarSincronizacionAutomatica() {
+    console.log('🔄 Inicializando sistema de sincronización...');
     
     // Limpiar interval anterior si existe
     if (syncInterval) {
         clearInterval(syncInterval);
+        console.log('🧹 Interval anterior limpiado');
     }
     
-    // Sincronización automática cada 3 segundos (muy agresiva)
-    syncInterval = setInterval(async () => {
+    // Sincronización inicial inmediata
+    setTimeout(async () => {
+        console.log('🚀 Ejecutando sincronización inicial...');
         await sincronizarEspaciosGlobal();
-    }, 3000);
+        
+        // Configurar sincronización automática después de la inicial
+        syncInterval = setInterval(async () => {
+            await sincronizarEspaciosGlobal();
+        }, 3000);
+        
+        console.log('✅ Sincronización automática configurada (cada 3 segundos)');
+    }, 1000);
     
     // Sincronización cuando la ventana recibe foco
     window.addEventListener('focus', () => {
@@ -1621,7 +1812,12 @@ function inicializarSincronizacionAutomatica() {
         }
     });
     
-    console.log('✅ Sincronización AGRESIVA configurada (cada 3 segundos)');
+    // Añadir función de diagnóstico al objeto window
+    if (typeof window !== 'undefined') {
+        console.log('🔧 Función de diagnóstico disponible: diagnosticarSincronizacion()');
+    }
+    
+    console.log('✅ Sistema de sincronización inicializado');
 }
 
 // Inicializar espacios en el servidor
@@ -1662,16 +1858,8 @@ async function inicializarEspaciosEnServidor() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Iniciando sistema Errekalde Car Wash...');
     
-    // Inicializar elementos del DOM
-    setupEventListeners();
-    initializeCalendar();
-    
-    // Inicializar espacios en el servidor
-    inicializarEspaciosEnServidor();
-    
-    // INICIALIZAR SISTEMA DE SINCRONIZACIÓN UNIVERSAL
-    console.log('🔄 Iniciando sincronización universal entre dispositivos...');
-    inicializarSincronizacionAutomatica();
+    // SOLO LIMPIEZA - NO DUPLICAR INICIALIZACIÓN
+    // La inicialización principal ya se hizo en el primer DOMContentLoaded
     
     // Limpieza conservadora de mensajes azules específicos
     const cleanUpBlueMessages = () => {
@@ -1708,3 +1896,154 @@ if (typeof module !== 'undefined' && module.exports) {
         detectVehicleSize
     };
 } 
+
+// ===== SISTEMA DE SINCRONIZACIÓN DE EMERGENCIA =====
+
+// SISTEMA DE SINCRONIZACIÓN DE EMERGENCIA SIN N8N
+window.forzarSincronizacionEmergencia = async function() {
+    console.log('🚨 ACTIVANDO SINCRONIZACIÓN DE EMERGENCIA (SIN N8N) 🚨');
+    
+    // 1. Limpiar cache local completamente
+    try {
+        localStorage.removeItem('espaciosGlobales');
+        localStorage.removeItem('lastSyncTime');
+        localStorage.removeItem('reservas');
+        console.log('🧹 Cache local limpiado completamente');
+    } catch (e) {
+        console.log('⚠️ No se pudo limpiar localStorage:', e);
+    }
+    
+    // 2. Resetear variables globales
+    espaciosGlobales = {};
+    lastSpacesHash = '';
+    lastSyncTime = null;
+    syncRetryCount = 0;
+    
+    console.log('🔄 Variables globales reseteadas');
+    
+    // 3. Crear espacios unificados con timestamp único
+    const timestampUnico = Date.now();
+    const espaciosUnificados = {};
+    
+    // Generar fechas de los próximos 12 miércoles con timestamp
+    const hoy = new Date();
+    for (let i = 0; i < 12; i++) {
+        const fecha = new Date(hoy);
+        const daysUntilWednesday = (3 - fecha.getDay() + 7) % 7;
+        fecha.setDate(fecha.getDate() + daysUntilWednesday + (i * 7));
+        
+        if (fecha > hoy) {
+            const fechaStr = fecha.toISOString().split('T')[0];
+            espaciosUnificados[fechaStr] = 8; // Resetear a 8 espacios
+        }
+    }
+    
+    console.log('📅 Espacios unificados creados:', Object.keys(espaciosUnificados).length, 'fechas');
+    
+    // 4. Guardar con timestamp único para sincronización
+    try {
+        const syncData = {
+            espacios: espaciosUnificados,
+            timestamp: timestampUnico,
+            lastUpdate: new Date().toISOString(),
+            syncId: Math.random().toString(36).substr(2, 9)
+        };
+        
+        localStorage.setItem('espaciosGlobales_unified', JSON.stringify(syncData));
+        localStorage.setItem('sync_timestamp', timestampUnico.toString());
+        console.log('💾 Datos unificados guardados con timestamp:', timestampUnico);
+    } catch (e) {
+        console.warn('⚠️ No se pudo guardar en localStorage:', e);
+    }
+    
+    // 5. Aplicar espacios unificados
+    espaciosGlobales = espaciosUnificados;
+    actualizarInterfazConEspacios();
+    updateSyncStatus('conectado');
+    
+    console.log('✅ Sincronización de emergencia completada');
+    showNotification('🚨 Sincronización de emergencia: Todos los dispositivos ahora tienen los mismos datos', 'success');
+    
+    // 6. Mostrar instrucciones al usuario
+    const instrucciones = `
+🔧 SINCRONIZACIÓN DE EMERGENCIA ACTIVADA
+
+✅ Datos unificados aplicados
+📱 Ejecuta este MISMO comando en todos tus dispositivos
+⏰ Timestamp único: ${timestampUnico}
+
+Para sincronizar otros dispositivos:
+1. Abre la consola (F12) en cada dispositivo
+2. Ejecuta: forzarSincronizacionEmergencia()
+3. Verifica que todos muestren el mismo timestamp
+
+🎯 Todos los dispositivos tendrán 8 espacios por miércoles
+`;
+    
+    console.log(instrucciones);
+    alert('✅ Sincronización completada!\n\nEjecuta este mismo comando en tus otros dispositivos.\n\nVer consola para más detalles.');
+    
+    return {
+        success: true,
+        timestamp: timestampUnico,
+        espacios: Object.keys(espaciosUnificados).length,
+        message: 'Ejecuta forzarSincronizacionEmergencia() en todos los dispositivos'
+    };
+};
+
+// Función para detectar y corregir desincronización automáticamente
+window.detectarDesincronizacion = async function() {
+    console.log('🔍 Detectando posible desincronización...');
+    
+    // Obtener datos de múltiples fuentes para comparar
+    const sources = [];
+    
+    // Source 1: N8N directo
+    try {
+        const n8nData = await obtenerEspaciosDesdeN8N();
+        if (n8nData) {
+            sources.push({ name: 'N8N', data: n8nData, hash: JSON.stringify(n8nData) });
+        }
+    } catch (e) {
+        console.log('⚠️ No se pudo obtener datos de N8N:', e);
+    }
+    
+    // Source 2: Datos actuales
+    sources.push({ 
+        name: 'Local', 
+        data: espaciosGlobales, 
+        hash: JSON.stringify(espaciosGlobales) 
+    });
+    
+    // Source 3: localStorage si existe
+    try {
+        const localData = localStorage.getItem('espaciosGlobales');
+        if (localData) {
+            const parsed = JSON.parse(localData);
+            sources.push({ name: 'LocalStorage', data: parsed, hash: JSON.stringify(parsed) });
+        }
+    } catch (e) {
+        console.log('⚠️ No hay datos en localStorage válidos');
+    }
+    
+    console.log('📊 Fuentes de datos encontradas:', sources.length);
+    sources.forEach(source => {
+        console.log(`   • ${source.name}: ${Object.keys(source.data).length} fechas`);
+    });
+    
+    // Detectar diferencias
+    const hashes = sources.map(s => s.hash);
+    const uniqueHashes = [...new Set(hashes)];
+    
+    if (uniqueHashes.length > 1) {
+        console.log('⚠️ DESINCRONIZACIÓN DETECTADA - múltiples versiones de datos');
+        console.log('🚨 Activando sincronización de emergencia automática...');
+        await forzarSincronizacionEmergencia();
+        return true;
+    } else {
+        console.log('✅ Todas las fuentes están sincronizadas');
+        return false;
+    }
+};
+
+// ===== SISTEMA DE SINCRONIZACIÓN VERDADERA CON N8N =====

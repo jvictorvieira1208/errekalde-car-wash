@@ -142,6 +142,113 @@ npm run migrate    # Migrar datos JSON → BD
 2. **Error de conexión BD**: Revisar credenciales en `config.js`
 3. **Migración falla**: Verificar que las tablas existan
 
+### **🔄 Problemas de Sincronización**
+
+#### **Síntomas de falta de sincronización:**
+- Los espacios disponibles no se actualizan entre dispositivos
+- Indicador muestra "🔴 Sin conexión" o "🔄 Reintentando"
+- Las reservas hechas en un dispositivo no aparecen en otros
+
+#### **Diagnóstico paso a paso:**
+
+1. **Verificar estado visual**
+   ```
+   • 🟢 Sincronizado = Todo funcionando correctamente
+   • 🟡 Sincronizando = Procesando actualización
+   • 🔄 Reintentando = Hay problemas, pero reintentando
+   • 🔴 Sin conexión = Error crítico de sincronización
+   ```
+
+2. **Ejecutar diagnóstico automático**
+   - Abrir **Consola del navegador** (F12 → Console)
+   - Ejecutar: `diagnosticarSincronizacion()`
+   - Revisar los resultados para identificar el problema
+
+3. **Verificar conectividad N8N**
+   ```bash
+   # Probar conectividad desde terminal
+   curl -X POST https://n8nserver.swapenergia.com/webhook/errekaldecarwash-spaces \
+        -H "Content-Type: application/json" \
+        -d '{"action":"ping","timestamp":1234567890}'
+   ```
+
+4. **Logs detallados en consola**
+   - Buscar mensajes que empiecen con ❌ (errores)
+   - Verificar si hay errores de timeout o de red
+   - Comprobar si N8N responde correctamente
+
+#### **Soluciones comunes:**
+
+1. **Problema: N8N no responde**
+   ```
+   ❌ Error: Timeout: N8N no respondió en 10 segundos
+   ```
+   **Solución:**
+   - Verificar conexión a internet
+   - Comprobar que `https://n8nserver.swapenergia.com` esté accesible
+   - Contactar administrador si el servidor está caído
+
+2. **Problema: Error de CORS**
+   ```
+   ❌ Error: Access to fetch blocked by CORS policy
+   ```
+   **Solución:**
+   - Verificar configuración CORS en N8N
+   - Asegurar que el dominio está permitido en N8N
+
+3. **Problema: Datos corruptos**
+   ```
+   ⚠️ N8N sin datos, inicializando espacios...
+   ```
+   **Solución:**
+   - Los espacios se reinicializan automáticamente
+   - Si persiste, ejecutar `diagnosticarSincronizacion()` para más información
+
+4. **Problema: Múltiples dispositivos no sincronizados**
+   ```
+   ℹ️ Sin cambios desde la última sincronización
+   ```
+   **Solución:**
+   - Esperar 3-5 segundos (intervalo de sincronización)
+   - Cambiar de pestaña y volver (fuerza sincronización)
+   - Refrescar la página en todos los dispositivos
+
+5. **Problema: Funcionamiento local vs producción**
+   ```
+   📱 MODO PRODUCCIÓN MÓVIL vs 💻 MODO DESARROLLO
+   ```
+   **Diferencias:**
+   - **Local (localhost)**: Sincronización a través de servidor Node.js
+   - **Producción (errekalde-car-wash.surge.sh)**: Sincronización directa con N8N
+
+#### **Comandos de depuración:**
+
+En la **consola del navegador**:
+```javascript
+// Diagnóstico completo
+diagnosticarSincronizacion()
+
+// Forzar sincronización manual
+sincronizarEspaciosGlobal()
+
+// Ver estado actual
+console.log('Espacios:', espaciosGlobales)
+console.log('Última sync:', lastSyncTime)
+console.log('Estado:', syncStatus)
+
+// Reiniciar sincronización
+clearInterval(syncInterval)
+inicializarSincronizacionAutomatica()
+```
+
+#### **Verificación de funcionamiento:**
+
+1. **Abrir el sitio en 2 dispositivos/pestañas diferentes**
+2. **En dispositivo 1**: Seleccionar una fecha y ver espacios disponibles
+3. **En dispositivo 2**: Verificar que muestra los mismos espacios
+4. **En dispositivo 1**: Hacer una reserva
+5. **En dispositivo 2**: En 3-5 segundos debería actualizarse automáticamente
+
 ### **Logs**
 - Aplicación: Console del navegador
 - Servidor: Terminal donde se ejecuta Node.js

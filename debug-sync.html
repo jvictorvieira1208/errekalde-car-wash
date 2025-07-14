@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Sincronización - Errekalde Car Wash</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .debug-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.disconnected { background: #f8d7da; color: #721c24; }
+        .status.syncing { background: #fff3cd; color: #856404; }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .data-table th {
+            background: #f2f2f2;
+        }
+        
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover { background: #0056b3; }
+        .button.emergency { background: #dc3545; }
+        .button.emergency:hover { background: #c82333; }
+        
+        .log {
+            background: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        
+        .device-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .device-info {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Debug Sincronización - Errekalde Car Wash</h1>
+    
+    <div class="debug-panel">
+        <h2>Estado de Sincronización</h2>
+        <div id="sync-status" class="status">Inicializando...</div>
+        <div>
+            <strong>Última sincronización:</strong> <span id="last-sync">Nunca</span><br>
+            <strong>Dispositivo:</strong> <span id="device-info"></span><br>
+            <strong>Entorno:</strong> <span id="environment"></span><br>
+            <strong>URL N8N:</strong> <span id="n8n-url"></span>
+        </div>
+    </div>
+    
+    <div class="debug-panel">
+        <h2>Acciones de Debug</h2>
+        <button class="button" onclick="runDiagnostic()">🔍 Diagnóstico Completo</button>
+        <button class="button" onclick="forceBrowserSync()">🔄 Forzar Sincronización</button>
+        <button class="button emergency" onclick="emergencySync()">🚨 Sincronización de Emergencia</button>
+        <button class="button" onclick="clearCache()">🧹 Limpiar Cache</button>
+        <button class="button" onclick="testN8N()">📡 Probar N8N</button>
+    </div>
+    
+    <div class="device-info">
+        <div class="debug-panel">
+            <h3>Datos Actuales</h3>
+            <div>
+                <strong>Espacios disponibles:</strong> <span id="spaces-count">0</span> fechas<br>
+                <strong>Espacios globales:</strong> <span id="spaces-data">Cargando...</span>
+            </div>
+            <table class="data-table" id="spaces-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Espacios</th>
+                        <th>Día</th>
+                    </tr>
+                </thead>
+                <tbody id="spaces-tbody">
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="debug-panel">
+            <h3>Log en Tiempo Real</h3>
+            <div id="debug-log" class="log"></div>
+            <button class="button" onclick="clearLog()">Limpiar Log</button>
+        </div>
+    </div>
+    
+    <div class="debug-panel">
+        <h2>Comparación entre Dispositivos</h2>
+        <p>Para probar la sincronización:</p>
+        <ol>
+            <li>Abre esta página en 2 dispositivos diferentes</li>
+            <li>Compara los datos de "Espacios disponibles"</li>
+            <li>Si son diferentes, usa "Sincronización de Emergencia"</li>
+            <li>Verifica que ambos dispositivos muestren los mismos datos</li>
+        </ol>
+        
+        <div style="background: #e7f3ff; padding: 15px; border-radius: 4px; margin: 10px 0;">
+            <strong>💡 Tip:</strong> Añade <code>?debug=true</code> a la URL del sitio principal para ver el botón de emergencia.
+        </div>
+    </div>
+
+    <!-- Cargar script principal -->
+    <script src="script.js"></script>
+    
+    <script>
+        let debugLog = [];
+        
+        // Override console.log para capturar logs
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.join(' ');
+            addToDebugLog(message);
+        };
+        
+        const originalError = console.error;
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            const message = 'ERROR: ' + args.join(' ');
+            addToDebugLog(message);
+        };
+        
+        function addToDebugLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            debugLog.push(`[${timestamp}] ${message}`);
+            if (debugLog.length > 50) debugLog.shift(); // Mantener solo últimos 50 logs
+            
+            const logElement = document.getElementById('debug-log');
+            if (logElement) {
+                logElement.textContent = debugLog.join('\n');
+                logElement.scrollTop = logElement.scrollHeight;
+            }
+        }
+        
+        function updateStatus() {
+            // Actualizar información del dispositivo
+            document.getElementById('device-info').textContent = 
+                `${navigator.platform} - ${screen.width}x${screen.height}`;
+            document.getElementById('environment').textContent = 
+                IS_PRODUCTION ? 'PRODUCCIÓN' : 'DESARROLLO';
+            document.getElementById('n8n-url').textContent = N8N_SPACES_URL;
+            
+            // Actualizar estado de sincronización
+            const statusElement = document.getElementById('sync-status');
+            const lastSyncElement = document.getElementById('last-sync');
+            
+            if (typeof syncStatus !== 'undefined') {
+                statusElement.textContent = syncStatus;
+                statusElement.className = `status ${syncStatus.replace(/[^a-z]/gi, '').toLowerCase()}`;
+            }
+            
+            if (typeof lastSyncTime !== 'undefined' && lastSyncTime) {
+                lastSyncElement.textContent = lastSyncTime.toLocaleString();
+            }
+            
+            // Actualizar datos de espacios
+            if (typeof espaciosGlobales !== 'undefined') {
+                const count = Object.keys(espaciosGlobales).length;
+                document.getElementById('spaces-count').textContent = count;
+                
+                // Actualizar tabla
+                const tbody = document.getElementById('spaces-tbody');
+                tbody.innerHTML = '';
+                
+                Object.entries(espaciosGlobales).slice(0, 10).forEach(([fecha, espacios]) => {
+                    const row = tbody.insertRow();
+                    const fechaObj = new Date(fecha);
+                    row.insertCell(0).textContent = fecha;
+                    row.insertCell(1).textContent = espacios;
+                    row.insertCell(2).textContent = fechaObj.toLocaleDateString('es-ES', { weekday: 'long' });
+                });
+            }
+        }
+        
+        // Funciones de debug
+        async function runDiagnostic() {
+            addToDebugLog('🔍 Ejecutando diagnóstico completo...');
+            if (typeof diagnosticarSincronizacion !== 'undefined') {
+                await diagnosticarSincronizacion();
+            } else {
+                addToDebugLog('❌ Función de diagnóstico no disponible');
+            }
+        }
+        
+        async function forceBrowserSync() {
+            addToDebugLog('🔄 Forzando sincronización...');
+            if (typeof sincronizarEspaciosGlobal !== 'undefined') {
+                await sincronizarEspaciosGlobal();
+            } else {
+                addToDebugLog('❌ Función de sincronización no disponible');
+            }
+        }
+        
+        async function emergencySync() {
+            addToDebugLog('🚨 Ejecutando sincronización de emergencia...');
+            if (typeof forzarSincronizacionEmergencia !== 'undefined') {
+                await forzarSincronizacionEmergencia();
+            } else {
+                addToDebugLog('❌ Función de emergencia no disponible');
+            }
+        }
+        
+        function clearCache() {
+            addToDebugLog('🧹 Limpiando cache...');
+            try {
+                localStorage.clear();
+                if (typeof espaciosGlobales !== 'undefined') {
+                    espaciosGlobales = {};
+                }
+                addToDebugLog('✅ Cache limpiado');
+            } catch (e) {
+                addToDebugLog('❌ Error limpiando cache: ' + e.message);
+            }
+        }
+        
+        async function testN8N() {
+            addToDebugLog('📡 Probando conectividad con N8N...');
+            try {
+                const response = await fetch(N8N_SPACES_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'ping', timestamp: Date.now() })
+                });
+                addToDebugLog(`✅ N8N responde: ${response.status} ${response.statusText}`);
+            } catch (error) {
+                addToDebugLog(`❌ Error conectando con N8N: ${error.message}`);
+            }
+        }
+        
+        function clearLog() {
+            debugLog = [];
+            document.getElementById('debug-log').textContent = '';
+        }
+        
+        // Actualizar estado cada segundo
+        setInterval(updateStatus, 1000);
+        
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            addToDebugLog('🚀 Debug page cargada');
+            updateStatus();
+        });
+    </script>
+</body>
+</html> 
