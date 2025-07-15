@@ -144,6 +144,12 @@ document.addEventListener('DOMContentLoaded', function() {
     updateNavigation();
     
     // ARREGLADO: Inicializar sincronización SIEMPRE
+    // ARREGLADO: Cargar espacios REALES inmediatamente al iniciar
+    console.log('🔄 INICIANDO CARGA DE ESPACIOS REALES...');
+    inicializarEspaciosEnServidor().then(() => {
+        console.log('✅ Espacios cargados, iniciando sincronización...');
+    });
+    
     setTimeout(async () => {
         console.log('🔍 Verificando sincronización entre dispositivos...');
         
@@ -2088,38 +2094,74 @@ async function sincronizarEspaciosUniversal() {
     }
 }
 
-// Inicializar espacios en el servidor
+// ARREGLADO: Cargar espacios REALES desde la base de datos
 async function inicializarEspaciosEnServidor() {
+    console.log('🔄 Cargando espacios REALES desde la base de datos...');
+    
     if (SERVER_URL) {
-        // Modo desarrollo - inicializar en servidor backend
         try {
-            const response = await fetch(`${SERVER_URL}/api/inicializar-espacios`, {
-                method: 'POST'
+            // PASO 1: CARGAR espacios actuales desde la API
+            console.log('📡 Consultando espacios desde:', `${SERVER_URL}/api/espacios`);
+            const response = await fetch(`${SERVER_URL}/api/espacios`, {
+                method: 'GET',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'X-Force-Reload': 'true'
+                }
             });
+            
             if (response.ok) {
-                console.log('✅ Espacios inicializados en el servidor');
+                const data = await response.json();
+                if (data.success && data.espacios) {
+                    // ✅ CARGAR espacios reales de la BD
+                    espaciosGlobales = data.espacios;
+                    localStorage.setItem('espaciosGlobales', JSON.stringify(espaciosGlobales));
+                    
+                    console.log('✅ Espacios REALES cargados desde BD:', espaciosGlobales);
+                    actualizarInterfazConEspacios();
+                    
+                    // Iniciar sincronización automática inmediatamente
+                    setTimeout(() => {
+                        iniciarSincronizacionAutomatica();
+                    }, 1000);
+                    
+                    return;
+                }
             }
+            
+            // FALLBACK: Si falla la API, inicializar espacios por defecto
+            console.warn('⚠️ API no disponible, inicializando espacios por defecto...');
+            await inicializarEspaciosPorDefecto();
+            
         } catch (error) {
-            console.error('Error inicializando espacios:', error);
+            console.error('❌ Error cargando espacios reales:', error);
+            await inicializarEspaciosPorDefecto();
         }
     } else {
-        // Modo producción - inicializar localmente
-        console.log('📱 Inicializando espacios para dispositivo móvil...');
-        
-        // Verificar si ya existen espacios en localStorage
-        const espaciosExistentes = localStorage.getItem('espaciosGlobales');
-        if (!espaciosExistentes) {
-            // Inicializar espacios por defecto
-            const espaciosIniciales = inicializarEspaciosPorDefecto();
-            localStorage.setItem('espaciosGlobales', JSON.stringify(espaciosIniciales));
-            espaciosGlobales = espaciosIniciales;
-            console.log('✅ Espacios inicializados localmente para móvil');
-        } else {
-            // Cargar espacios existentes
-            espaciosGlobales = JSON.parse(espaciosExistentes);
-            console.log('✅ Espacios cargados desde localStorage para móvil');
-        }
+        // Sin servidor configurado - usar fallback
+        console.log('⚠️ Sin servidor configurado, usando espacios por defecto');
+        await inicializarEspaciosPorDefecto();
     }
+}
+
+// Función fallback para espacios por defecto
+async function inicializarEspaciosPorDefecto() {
+    const espaciosIniciales = {
+        '2025-07-16': 8,
+        '2025-07-23': 8, 
+        '2025-07-30': 8,
+        '2025-08-06': 8,
+        '2025-08-13': 8,
+        '2025-08-20': 8,
+        '2025-08-27': 8,
+        '2025-09-03': 8
+    };
+    
+    espaciosGlobales = espaciosIniciales;
+    localStorage.setItem('espaciosGlobales', JSON.stringify(espaciosIniciales));
+    actualizarInterfazConEspacios();
+    
+    console.log('📱 Espacios por defecto inicializados:', espaciosIniciales);
 }
 
 // LIMPIEZA CONSERVADORA de mensajes azules específicos
@@ -2415,10 +2457,38 @@ function iniciarSincronizacionAutomatica() {
     // Iniciar polling adaptativo
     ajustarFrecuenciaSincronizacion();
     
-    // Sincronización cuando la ventana recupera el foco
+    // Sincronización cuando la ventana recupera el foco (FORZAR RECARGA)
     window.addEventListener('focus', () => {
-        console.log('👁️ Ventana activa, sincronizando...');
-        sincronizarEspaciosUniversal();
+        console.log('👁️ Ventana activa, FORZANDO sincronización inmediata...');
+        inicializarEspaciosEnServidor().then(() => {
+            sincronizarEspaciosUniversal();
+        });
+    });
+    
+    // Sincronización adicional cada vez que se hace click (detectar actividad)
+    document.addEventListener('click', () => {
+        lastUserActivity = Date.now();
+        // Sincronización ligera cada click
+        if (Date.now() - lastSyncTime > 5000) { // Solo si han pasado 5+ segundos
+            sincronizarEspaciosAutomatico();
+        }
+    });
+    
+    // Polling agresivo para sincronización
+    setInterval(async () => {
+        if (SERVER_URL) {
+            await sincronizarEspaciosAutomatico();
+        }
+    }, SYNC_CONFIG.INTERVAL_FAST); // 5 segundos siempre
+    
+    // Detectar cuando el usuario regresa a la pestaña (visibilitychange)
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            console.log('👁️ Usuario regresó a la pestaña, sincronizando...');
+            inicializarEspaciosEnServidor().then(() => {
+                console.log('✅ Espacios actualizados al regresar a la pestaña');
+            });
+        }
     });
     
     // Sincronización antes de que el usuario se vaya
@@ -2503,10 +2573,16 @@ async function sincronizarEspaciosAutomatico() {
                         // Actualizar localStorage
                         localStorage.setItem('espaciosGlobales', JSON.stringify(espaciosGlobales));
                         
+                        // Actualizar tiempo de sincronización
+                        lastSyncTime = Date.now();
+                        
                         // Notificación discreta solo si hay muchos cambios
                         if (cambiosDetectados.length > 1) {
                             showNotification(`🔄 ${cambiosDetectados.length} espacios actualizados automáticamente`, 'info', 3000);
                         }
+                    } else {
+                        // Actualizar tiempo de sincronización aunque no haya cambios
+                        lastSyncTime = Date.now();
                     }
                 } else {
                     console.warn('⚠️ Respuesta de sincronización sin datos válidos:', data);
