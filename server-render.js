@@ -352,11 +352,11 @@ app.post('/api/reservas', async (req, res) => {
         // Generar ID único para la reserva
         const reservationId = `RESERVA-${Date.now()}`;
         
-        // Crear tabla de reservas si no existe
+        // Crear/actualizar tabla de reservas con esquema correcto
         await db.query(`
             CREATE TABLE IF NOT EXISTS reservas (
                 id SERIAL PRIMARY KEY,
-                reservation_id VARCHAR(50) UNIQUE NOT NULL,
+                reservation_id VARCHAR(50) UNIQUE,
                 fecha DATE NOT NULL,
                 nombre VARCHAR(100) NOT NULL,
                 telefono VARCHAR(20) NOT NULL,
@@ -369,6 +369,17 @@ app.post('/api/reservas', async (req, res) => {
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
         `);
+        
+        // Agregar columna reservation_id si no existe
+        try {
+            await db.query(`
+                ALTER TABLE reservas 
+                ADD COLUMN IF NOT EXISTS reservation_id VARCHAR(50) UNIQUE
+            `);
+            console.log('✅ Columna reservation_id verificada/agregada');
+        } catch (alterError) {
+            console.log('ℹ️ Columna reservation_id ya existe o error menor:', alterError.message);
+        }
         
         // Insertar reserva en la base de datos
         await db.query(`
