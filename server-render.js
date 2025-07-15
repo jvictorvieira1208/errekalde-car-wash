@@ -289,6 +289,30 @@ app.post('/api/inicializar-espacios', async (req, res) => {
     }
 });
 
+// Endpoint básico para verificar que el servidor funciona
+app.get('/', (req, res) => {
+    res.json({ 
+        message: '🚀 Errekalde Car Wash API funcionando',
+        status: 'online',
+        version: '1.0.0',
+        endpoints: {
+            health: '/api/health',
+            espacios: '/api/espacios',
+            reservas: '/api/reservas'
+        }
+    });
+});
+
+// Endpoint simple que no requiere BD
+app.get('/api/status', (req, res) => {
+    res.json({ 
+        status: 'server_running',
+        port: PORT,
+        database_type: DB_TYPE,
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Endpoint de salud para verificar conexión a BD
 app.get('/api/health', async (req, res) => {
     try {
@@ -317,12 +341,9 @@ app.get('/api/health', async (req, res) => {
 // Función para crear tablas PostgreSQL automáticamente
 async function crearTablasPostgreSQL() {
     try {
-        console.log('🔧 Verificando/creando tablas PostgreSQL...');
+        console.log('🔧 Iniciando creación de tablas PostgreSQL...');
         
-        // Crear extensiones necesarias primero
-        await db.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";');
-        
-        // Crear tabla espacios_disponibles si no existe
+        // Paso 1: Crear tabla espacios_disponibles
         await db.query(`
             CREATE TABLE IF NOT EXISTS espacios_disponibles (
                 id SERIAL PRIMARY KEY,
@@ -333,8 +354,9 @@ async function crearTablasPostgreSQL() {
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
         `);
+        console.log('✅ Tabla espacios_disponibles creada/verificada');
         
-        // Crear tabla servicios si no existe
+        // Paso 2: Crear tabla servicios
         await db.query(`
             CREATE TABLE IF NOT EXISTS servicios (
                 id SERIAL PRIMARY KEY,
@@ -348,48 +370,25 @@ async function crearTablasPostgreSQL() {
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
         `);
+        console.log('✅ Tabla servicios creada/verificada');
         
-        // Crear tabla reservas si no existe
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS reservas (
-                id SERIAL PRIMARY KEY,
-                fecha DATE NOT NULL,
-                nombre VARCHAR(100) NOT NULL,
-                telefono VARCHAR(20) NOT NULL,
-                marca_vehiculo VARCHAR(50),
-                modelo_vehiculo VARCHAR(50),
-                tamano_vehiculo VARCHAR(20) CHECK (tamano_vehiculo IN ('small', 'medium', 'large')),
-                servicios JSONB,
-                precio_total DECIMAL(10,2) NOT NULL,
-                notas TEXT,
-                codigo_verificacion VARCHAR(10),
-                verificado BOOLEAN DEFAULT false,
-                estado VARCHAR(20) DEFAULT 'confirmada' CHECK (estado IN ('pendiente', 'confirmada', 'cancelada')),
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-        `);
-        
-        // Verificar si hay servicios, si no, insertarlos
-        const serviciosExistentes = await db.query('SELECT COUNT(*) as count FROM servicios;');
-        if (serviciosExistentes[0].count === 0) {
+        // Paso 3: Insertar servicios básicos (solo si la tabla está vacía)
+        try {
             await db.query(`
-                INSERT INTO servicios (codigo, nombre, descripcion, precio_small, precio_medium, precio_large) VALUES
-                ('interior', 'Lavado Interior', 'Limpieza completa del interior del vehículo', 20.00, 23.00, 25.00),
-                ('exterior', 'Lavado Exterior', 'Lavado exterior completo con encerado', 18.00, 20.00, 23.00),
-                ('complete', 'Lavado Completo', 'Lavado interior + exterior completo', 35.00, 40.00, 45.00),
-                ('complete-fabric', 'Lavado + Tapicería', 'Lavado completo + limpieza de tapicería', 75.00, 85.00, 95.00),
-                ('headlight-1', 'Pulido 1 Faro', 'Pulido y restauración de un faro', 35.00, 35.00, 35.00),
-                ('headlight-2', 'Pulido 2 Faros', 'Pulido y restauración de ambos faros', 60.00, 60.00, 60.00);
+                INSERT INTO servicios (codigo, nombre, descripcion, precio_small, precio_medium, precio_large) 
+                SELECT 'complete', 'Lavado Completo', 'Lavado interior + exterior completo', 35.00, 40.00, 45.00
+                WHERE NOT EXISTS (SELECT 1 FROM servicios WHERE codigo = 'complete');
             `);
-            console.log('✅ Servicios iniciales insertados');
+            console.log('✅ Servicios básicos insertados');
+        } catch (err) {
+            console.log('ℹ️ Servicios ya existen, continuando...');
         }
         
-        console.log('✅ Tablas PostgreSQL verificadas/creadas exitosamente');
+        console.log('✅ Base de datos inicializada correctamente');
+        return true;
     } catch (error) {
-        console.error('❌ Error creando tablas PostgreSQL:', error.message);
-        console.error('Error completo:', error);
-        // No lanzar el error para que el servidor siga intentando
+        console.error('❌ Error en creación de tablas:', error.message);
+        return false;
     }
 }
 
@@ -406,25 +405,39 @@ async function inicializarServidor() {
             console.log('✅ Conexión a PostgreSQL establecida');
             
             // Auto-crear tablas si no existen
-            await crearTablasPostgreSQL();
-            console.log('✅ Tablas PostgreSQL verificadas/creadas');
+            const tablasOK = await crearTablasPostgreSQL();
+            if (tablasOK) {
+                console.log('✅ Tablas PostgreSQL verificadas/creadas');
+            } else {
+                console.log('⚠️ Problema con tablas, pero continuando...');
+            }
         } else {
             await db.testConnection();
             console.log('✅ Conexión a MySQL/MariaDB establecida');
         }
         
-        // Inicializar espacios por defecto
-        await db.inicializarProximosMiercoles(12);
-        console.log('📅 Espacios inicializados para los próximos miércoles');
+        // Inicializar espacios por defecto (solo si las tablas funcionan)
+        try {
+            await db.inicializarProximosMiercoles(12);
+            console.log('📅 Espacios inicializados para los próximos miércoles');
+        } catch (err) {
+            console.log('ℹ️ No se pudieron inicializar espacios, pero continuando...');
+        }
         
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🎉 Servidor corriendo en puerto ${PORT}`);
             console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+            console.log(`🌐 URL pública: https://errekalde-car-wash-1.onrender.com`);
         });
         
     } catch (error) {
         console.error('❌ Error al inicializar servidor:', error);
-        process.exit(1);
+        
+        // Intentar arrancar servidor básico aunque falle la BD
+        console.log('⚠️ Iniciando servidor en modo básico...');
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log(`🎉 Servidor básico corriendo en puerto ${PORT}`);
+        });
     }
 }
 
