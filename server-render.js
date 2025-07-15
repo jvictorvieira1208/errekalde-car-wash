@@ -77,8 +77,9 @@ app.get('/api/test-espacios', async (req, res) => {
 let db = null;
 const DB_TYPE = process.env.DB_TYPE || 'postgresql';
 
-// CACHE PARA EVITAR MÚLTIPLES ENVÍOS N8N (protección extra)
+// 🔒 PROTECCIÓN ANTI-DUPLICADOS ULTRA FUERTE
 const reservasProcesadas = new Map();
+const reservasEnProceso = new Set(); // Prevenir múltiples envíos simultáneos
 
 if (DB_TYPE === 'postgresql' && process.env.DATABASE_URL) {
     const { Pool } = require('pg');
@@ -258,6 +259,32 @@ app.get('/api/espacios/:fecha', async (req, res) => {
             error: error.message,
             timestamp: new Date().toISOString()
         });
+    }
+});
+
+// 🔍 DEBUG ENDPOINT - PROTECCIÓN ANTI-DUPLICADOS
+app.get('/api/debug-duplicados', (req, res) => {
+    try {
+        const estadoProteccion = {
+            reservas_procesadas: reservasProcesadas.size,
+            reservas_en_proceso: reservasEnProceso.size,
+            timestamp: new Date().toISOString(),
+            detalles_procesadas: Array.from(reservasProcesadas.entries()).map(([key, data]) => ({
+                key,
+                reservationId: data.reservationId,
+                phone: data.phone,
+                status: data.status,
+                tiempo_procesado: new Date(data.timestamp).toLocaleString('es-ES')
+            })),
+            detalles_en_proceso: Array.from(reservasEnProceso)
+        };
+        
+        console.log('🔍 Estado actual protección anti-duplicados:', estadoProteccion);
+        res.json(estadoProteccion);
+        
+    } catch (error) {
+        console.error('Error en debug duplicados:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -483,18 +510,25 @@ app.post('/api/reservas', async (req, res) => {
             }
         }
         
-        // Crear mensaje de confirmación con formato específico (usar \n, no \\n)
-        const message = `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗\n\n✅ Hola ${nombre}, tu reserva está confirmada\n\n📅 *Fecha:* ${fecha}\n🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón\n\n👤 *Cliente:* ${nombre}\n📞 *Teléfono:* ${telefono}\n🚗 *Vehículo:* ${vehicle} (${vehicleSizeText})\n🧽 *Servicio:* ${servicios}${suplementos ? `\n✨ *Suplementos:* ${suplementos}` : ''}\n💰 *Precio Total:* ${precio_total}€\n🆔 *ID Reserva:* ${reservationId}${notas ? `\n\n📝 *Notas adicionales:* ${notas}` : ''}\n\n📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*\n🏢 *Ubicación:* Pabellón SWAP ENERGIA\n🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00\n🕐 *No hay horario específico de lavado*\n\n*¡Gracias por usar nuestro servicio!* 🤝\n\n_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`;
+        // Formatear fecha en español para WhatsApp
+        const fechaFormateada = new Date(fecha + 'T00:00:00').toLocaleDateString('es-ES', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
 
-        // Datos para enviar a n8n (UNA SOLA VEZ) - FORMATO EXACTO REQUERIDO
+        // Crear mensaje de confirmación con formato específico (usar \n, no \\n)
+        const message = `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗\n\n✅ Hola ${nombre}, tu reserva está confirmada\n\n📅 *Fecha:* ${fechaFormateada}\n🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón\n\n👤 *Cliente:* ${nombre}\n📞 *Teléfono:* ${telefono}\n🚗 *Vehículo:* ${vehicle} (${vehicleSizeText})\n🧽 *Servicio:* ${servicios}${suplementos ? `\n✨ *Suplementos:* ${suplementos}` : ''}\n💰 *Precio Total:* ${precio_total}€\n🆔 *ID Reserva:* ${reservationId}${notas ? `\n\n📝 *Notas adicionales:* ${notas}` : ''}\n\n📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*\n🏢 *Ubicación:* Pabellón SWAP ENERGIA\n🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00\n🕐 *No hay horario específico de lavado*\n\n*¡Gracias por usar nuestro servicio!* 🤝\n\n_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`;
+
+        // 📋 FORMATO EXACTO PARA WHATSAPP BUSINESS CLOUD3 (estructura plana)
         const n8nData = {
             phone: telefono,
             message: message,
             type: 'booking',
             reservationId: reservationId,
-            // Estructura plana como se requiere
             name: nombre,
-            date: fecha,
+            date: fechaFormateada,
             vehicle: vehicle,
             services: servicios,
             supplements: suplementos,
@@ -503,53 +537,79 @@ app.post('/api/reservas', async (req, res) => {
             notes: notas || ''
         };
         
-        // PROTECCIÓN: Verificar si ya se envió esta reserva
-        if (reservasProcesadas.has(reservationId)) {
-            console.log(`⚠️ Reserva ${reservationId} ya fue enviada a N8N, evitando duplicado`);
+        // 🔒 PROTECCIÓN ANTI-DUPLICADOS ULTRA FUERTE
+        const proteccionKey = `${telefono}_${fecha}_${reservationId}`;
+        
+        if (reservasProcesadas.has(proteccionKey) || reservasEnProceso.has(proteccionKey)) {
+            console.log(`🛡️ PROTECCIÓN ACTIVADA: Reserva ${reservationId} ya procesada/en proceso - BLOQUEANDO duplicado`);
         } else {
-            // Marcar como procesada ANTES de enviar
-            reservasProcesadas.set(reservationId, Date.now());
-            
-            // Limpiar cache cada 10 minutos (evitar memory leak)
-            if (reservasProcesadas.size > 100) {
-                const ahora = Date.now();
-                for (const [id, timestamp] of reservasProcesadas.entries()) {
-                    if (ahora - timestamp > 600000) { // 10 minutos
-                        reservasProcesadas.delete(id);
-                    }
-                }
-            }
-            
-            // Enviar a n8n (UNA SOLA VEZ GARANTIZADA)
-            const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
+            // Marcar como EN PROCESO para evitar envíos simultáneos
+            reservasEnProceso.add(proteccionKey);
             
             try {
-                console.log(`📡 ENVIANDO A N8N (primera vez): ${reservationId}`);
-                console.log('📋 Estructura de datos:', JSON.stringify(n8nData, null, 2));
+                // Marcar como procesada ANTES de enviar
+                reservasProcesadas.set(proteccionKey, {
+                    timestamp: Date.now(),
+                    reservationId: reservationId,
+                    phone: telefono,
+                    status: 'sending'
+                });
+                
+                // Limpiar cache cada 5 minutos (evitar memory leak)
+                if (reservasProcesadas.size > 50) {
+                    const ahora = Date.now();
+                    for (const [key, data] of reservasProcesadas.entries()) {
+                        if (ahora - data.timestamp > 300000) { // 5 minutos
+                            reservasProcesadas.delete(key);
+                        }
+                    }
+                }
+                
+                // Enviar a n8n (UNA SOLA VEZ GARANTIZADA)
+                const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
+                
+                console.log(`📡 ENVIANDO A N8N (ÚNICO ENVÍO): ${reservationId}`);
+                console.log('📋 Payload WhatsApp Business Cloud3:', JSON.stringify(n8nData, null, 2));
                 
                 const fetch = (await import('node-fetch')).default;
                 const response = await fetch(N8N_WEBHOOK_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'User-Agent': 'Errekalde-CarWash-Backend/1.0',
+                        'X-Request-ID': reservationId
                     },
-                    body: JSON.stringify(n8nData)
+                    body: JSON.stringify(n8nData),
+                    timeout: 15000 // 15 segundos timeout
                 });
                 
                 const responseText = await response.text();
                 
                 if (response.ok) {
-                    console.log(`✅ Notificación enviada exitosamente a N8N para reserva ${reservationId}`);
-                    console.log(`📥 Respuesta N8N: ${responseText}`);
+                    console.log(`✅ WhatsApp enviado exitosamente a ${telefono} para reserva ${reservationId}`);
+                    console.log(`📥 Respuesta N8N (${response.status}): ${responseText}`);
+                    
+                    // Marcar como exitoso
+                    reservasProcesadas.set(proteccionKey, {
+                        timestamp: Date.now(),
+                        reservationId: reservationId,
+                        phone: telefono,
+                        status: 'sent_successfully'
+                    });
                 } else {
-                    console.error(`❌ Error enviando a N8N: ${response.status} - ${responseText}`);
-                    // Si falla, remover del cache para permitir reintento
-                    reservasProcesadas.delete(reservationId);
+                    console.error(`❌ Error N8N (${response.status}): ${responseText}`);
+                    
+                    // Si falla, remover protección para permitir reintento manual
+                    reservasProcesadas.delete(proteccionKey);
                 }
             } catch (error) {
-                console.error('❌ Error enviando a N8N:', error.message);
-                // Si falla, remover del cache para permitir reintento
-                reservasProcesadas.delete(reservationId);
+                console.error('❌ Error crítico enviando WhatsApp:', error.message);
+                
+                // Si falla, remover protección para permitir reintento
+                reservasProcesadas.delete(proteccionKey);
+            } finally {
+                // Siempre remover del proceso activo
+                reservasEnProceso.delete(proteccionKey);
             }
         }
         

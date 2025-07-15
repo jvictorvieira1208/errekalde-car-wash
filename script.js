@@ -62,7 +62,7 @@ let lastUserActivity = Date.now();
 let currentSyncMode = 'normal';
 const N8N_VALIDATION_URL = 'https://n8nserver.swapenergia.com/webhook/validarNúmero';
 const N8N_SYNC_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash-sync';
-const N8N_SPACES_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash'; // USAR EL QUE FUNCIONA
+const N8N_SPACES_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash-spaces'; // Para espacios
 
 // Detección automática de entorno - Backend centralizado + N8N fallback
 function getServerUrl() {
@@ -908,9 +908,11 @@ async function handleConfirmReservation() {
                     await sincronizarEspaciosUniversal();
                 }, 1000);
                 
-                // 9. El backend ya envió automáticamente el WhatsApp via n8n
+                // 9. El backend ya envió automáticamente el WhatsApp via n8n - NO ENVIAR DESDE FRONTEND
                 console.log('📱 Backend envió confirmación WhatsApp automáticamente');
                 showNotification('📱 Confirmación WhatsApp enviada automáticamente', 'success');
+                
+                // ❌ ELIMINADO: No más confirmaciones desde frontend para evitar duplicados
                 
             } else {
                 throw new Error(resultadoReserva.error || 'Error del servidor');
@@ -1087,191 +1089,16 @@ async function sendVerificationCode(phone, code) {
             return { success: true, status: response.status, warning: 'Status no estándar' };
         }
     } catch (error) {
-        console.error('❌ Error en verificación:', error);
-        
-        // En lugar de fallar completamente, permitir continuar
-        // ya que el código se genera localmente
-        console.log('💡 Continuando con verificación local (código visible en pantalla)');
-        throw new Error('No se pudo enviar el código por WhatsApp, pero puedes continuar con la verificación');
+        console.error('Error enviando código de verificación:', error);
+        throw error;
     }
 }
 
-async function sendBookingConfirmation(reservationData) {
-    // Generar ID de reserva único
-    const reservationId = `RESERVA-${Date.now()}`;
-    
-    // Formatear solo servicios principales (sin faros/suplementos)
-    let serviciosTexto = reservationData.services.filter(serviceType => 
-        !['headlight-1', 'headlight-2'].includes(serviceType)
-    ).map(serviceType => {
-        switch(serviceType) {
-            case 'interior': return 'Limpieza interior';
-            case 'exterior': return 'Limpieza exterior';
-            case 'complete': return 'Limpieza completa';
-            case 'complete-fabric': return 'Limpieza completa con tapicería';
-            default: return serviceType;
-        }
-    }).join(' + ');
-    
-    // Detectar suplementos
-    let suplementos = "Ninguno";
-    if (reservationData.services.some(service => service.includes('headlight'))) {
-        suplementos = reservationData.services
-            .filter(service => service.includes('headlight'))
-            .map(service => service === 'headlight-1' ? 'Un faro' : 'Dos faros')
-            .join(', ');
-    }
-    
-    // Agregar notas si existen
-    let notasTexto = '';
-    if (reservationData.notas && reservationData.notas.trim()) {
-        notasTexto = `📝 *Notas adicionales:* ${reservationData.notas}
-
-`;
-    }
-    
-    // Mensaje con el formato exacto solicitado
-    const mensajeWhatsApp = `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗
-
-✅ Hola ${reservationData.name}, tu reserva está confirmada
-
-📅 *Fecha:* ${selectedDate.toLocaleDateString('es-ES', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-    })}
-🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón
-
-👤 *Cliente:* ${reservationData.name}
-📞 *Teléfono:* ${reservationData.phone}
-🚗 *Vehículo:* ${reservationData.carBrand} ${reservationData.carModel} (${reservationData.carSize === 'small' ? 'pequeño' : reservationData.carSize === 'medium' ? 'mediano' : 'grande'})
-🧽 *Servicio:* ${serviciosTexto}
-✨ *Suplementos:* ${suplementos}
-💰 *Precio Total:* ${reservationData.price}€
-🆔 *ID Reserva:* ${reservationId}
-
-${notasTexto}📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*
-🏢 *Ubicación:* Pabellón SWAP ENERGIA
-🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00
-🕐 *No hay horario específico de lavado*
-
-*¡Gracias por usar nuestro servicio!* 🤝
-
-_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`;
-    
-    const payload = {
-        phone: reservationData.phone,
-        message: mensajeWhatsApp,
-        type: 'booking',
-        reservationId: reservationId,
-        reservationData: {
-            name: reservationData.name,
-            phone: reservationData.phone,
-            date: selectedDate.toLocaleDateString('es-ES', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-            }),
-            vehicle: `${reservationData.carBrand} ${reservationData.carModel}`,
-            services: serviciosTexto,
-            supplements: suplementos,
-            price: reservationData.price,
-            vehicleSize: reservationData.carSize,
-            notes: reservationData.notas || ''
-        }
-    };
-    
-    console.log('🔍 DEBUG - Payload enviado a N8N:', JSON.stringify(payload, null, 2));
-    
-    if (SERVER_URL) {
-        // Modo desarrollo - usar servidor backend como proxy
-        const response = await fetch(`${SERVER_URL}/api/send-webhook`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload)
-        });
-        
-        console.log('🔍 DEBUG - Respuesta del servidor:', response.status, response.statusText);
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('❌ ERROR - Respuesta del servidor:', errorData);
-            throw new Error(errorData.error || 'Error en la comunicación con n8n');
-        }
-        
-        const responseData = await response.json();
-        console.log('✅ DEBUG - Datos de respuesta completos:', responseData);
-        
-        return responseData;
-    } else {
-        // Modo producción - petición directa a N8N
-        try {
-            console.log('📡 Enviando directamente a N8N desde dispositivo móvil...');
-            
-            const response = await fetch(N8N_WEBHOOK_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify(payload),
-                mode: 'cors' // Permitir CORS
-            });
-            
-            console.log('📡 Respuesta directa de N8N:', response.status, response.statusText);
-            
-            // N8N puede devolver diferentes códigos de estado
-            if (response.status >= 200 && response.status < 400) {
-                console.log('✅ Webhook enviado correctamente a N8N desde móvil');
-                
-                // Intentar parsear la respuesta JSON si existe
-                try {
-                    const result = await response.text();
-                    console.log('📄 Respuesta de N8N:', result);
-                    return { 
-                        success: true, 
-                        status: response.status, 
-                        response: result,
-                        source: 'direct-mobile'
-                    };
-                } catch (e) {
-                    // Si no hay contenido válido, devolver éxito
-                    return { 
-                        success: true, 
-                        status: response.status,
-                        source: 'direct-mobile' 
-                    };
-                }
-            } else {
-                console.warn('⚠️ N8N devolvió status no estándar:', response.status);
-                // Incluso si N8N devuelve un status diferente, puede que haya funcionado
-                return { 
-                    success: true, 
-                    status: response.status, 
-                    warning: 'Status no estándar pero posiblemente exitoso',
-                    source: 'direct-mobile'
-                };
-            }
-        } catch (error) {
-            console.error('❌ Error directo con N8N desde móvil:', error);
-            
-            // En producción móvil, si falla el webhook no es crítico
-            // La reserva ya está confirmada localmente
-            console.log('💡 La reserva está confirmada aunque el WhatsApp puede haber fallado');
-            return { 
-                success: false, 
-                error: error.message,
-                fallback: true,
-                message: 'Reserva confirmada pero notificación WhatsApp puede haber fallado',
-                source: 'direct-mobile-failed'
-            };
-        }
-    }
-}
+// ❌ FUNCIÓN ELIMINADA: sendBookingConfirmation
+// RAZÓN: Causaba confirmaciones duplicadas - el backend ahora maneja TODO automáticamente
+// El servidor en /api/reservas envía la confirmación WhatsApp una sola vez
+// Esto evita múltiples mensajes al mismo usuario por la misma reserva
+console.log('📱 IMPORTANTE: Confirmaciones WhatsApp solo desde backend para evitar duplicados');
 
 
 
@@ -1636,41 +1463,10 @@ async function hacerReservaEnServidor(reservaData) {
     }
 }
 
-// Función para crear reserva en N8N
-async function crearReservaEnN8N(reservaData) {
-    try {
-        console.log('📝 Creando reserva en N8N...');
-        
-        const payload = {
-            action: 'create_reservation',
-            reserva: reservaData,
-            timestamp: Date.now(),
-            cache_buster: CACHE_BUSTER + '_' + Date.now(),
-            source: IS_PRODUCTION ? 'mobile' : 'desktop'
-        };
-        
-        const response = await fetch(N8N_WEBHOOK_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-            },
-            body: JSON.stringify(payload)
-        });
-        
-        if (response.ok) {
-            console.log('✅ Reserva creada en N8N');
-            return { success: true };
-        } else {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-    } catch (error) {
-        console.error('❌ Error creando reserva en N8N:', error);
-        return { success: false, error: error.message };
-    }
-}
+// ❌ FUNCIÓN ELIMINADA: crearReservaEnN8N 
+// RAZÓN: El backend maneja automáticamente N8N, evitando duplicados
+// Solo el servidor envía confirmaciones WhatsApp desde /api/reservas
+console.log('🚫 Frontend YA NO envía reservas directamente a N8N');
 
 // Generar ID único del dispositivo
 function generateDeviceId() {
@@ -1996,14 +1792,14 @@ async function sincronizarEspaciosUniversal() {
         
         // PASO 2: Fallback a N8N si backend no responde
         const payload = {
-            action: 'get_universal_spaces',
+            action: 'get_spaces',
             timestamp: Date.now(),
             cache_buster: 'UNIVERSAL_' + Date.now(),
             source: IS_PRODUCTION ? 'production' : 'development',
             device_id: generateDeviceId()
         };
         
-        const response = await fetch(N8N_WEBHOOK_URL, {
+        const response = await fetch(N8N_SPACES_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
