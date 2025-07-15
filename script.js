@@ -71,8 +71,8 @@ function getServerUrl() {
         return 'http://localhost:3001';
     }
     // Para producción, usar backend desplegado en Render
-    // IMPORTANTE: Cambiar esta URL cuando despliegues tu backend
-    return 'https://errekalde-car-wash-backend.onrender.com';
+    // ✅ URL CORREGIDA - Servidor real funcionando
+    return 'https://errekalde-car-wash-1-ofu7.onrender.com';
 }
 
 // Variables globales
@@ -919,25 +919,20 @@ async function handleConfirmReservation() {
             }
             
         } catch (serverError) {
-            console.error('❌ Error en servidor, manteniendo reserva local:', serverError);
+            console.error('❌ Error conectando con servidor:', serverError);
             
-            // Mantener la actualización local aunque falle el servidor
-            showNotification('⚠️ Reserva guardada localmente. Se sincronizará cuando haya conexión.', 'warning');
+            // ❌ NO GUARDAR LOCALMENTE - MOSTRAR ERROR Y PERMITIR REINTENTO
+            showNotification('❌ Error al procesar reserva. Verifique su conexión e intente nuevamente.', 'error');
             
-            // Guardar en localStorage para sincronización posterior
-            try {
-                const reservasOffline = JSON.parse(localStorage.getItem('reservas_offline') || '[]');
-                reservasOffline.push(reservaCompleta);
-                localStorage.setItem('reservas_offline', JSON.stringify(reservasOffline));
-                console.log('💾 Reserva guardada offline para sincronización posterior');
-            } catch (e) {
-                console.warn('⚠️ No se pudo guardar offline:', e);
+            // Revertir espacios ya que la reserva no se procesó
+            const fechaStr = selectedDate.toISOString().split('T')[0];
+            if (espaciosGlobales[fechaStr] !== undefined) {
+                espaciosGlobales[fechaStr] = Math.min((espaciosGlobales[fechaStr] || 0) + 1, 8);
+                actualizarInterfazConEspacios();
+                console.log(`🔄 Espacios revertidos para ${fechaStr}: ${espaciosGlobales[fechaStr]}`);
             }
             
-            // Mostrar página de éxito de todos modos
-            pages.forEach(page => page.classList.remove('active'));
-            document.getElementById('success-page').classList.add('active');
-            generateFinalSummary();
+            throw serverError; // Propagar error para que se maneje en el catch principal
         }
         
     } catch (error) {
@@ -1731,8 +1726,7 @@ function inicializarSincronizacionAutomatica() {
     window.addEventListener('online', () => {
         console.log('🌐 Conexión restaurada, sincronizando...');
         setTimeout(sincronizarEspaciosUniversal, 500);
-        // También sincronizar reservas offline
-        setTimeout(sincronizarReservasOffline, 1000);
+        // ❌ ELIMINADO: Ya no hay reservas offline
     });
     
     // Añadir función de diagnóstico al objeto window
@@ -1992,60 +1986,11 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Sistema iniciado correctamente con sincronización universal');
 });
 
-// FUNCIÓN PARA SINCRONIZAR RESERVAS OFFLINE
-async function sincronizarReservasOffline() {
-    try {
-        const reservasOffline = JSON.parse(localStorage.getItem('reservas_offline') || '[]');
-        
-        if (reservasOffline.length === 0) {
-            console.log('ℹ️ No hay reservas offline para sincronizar');
-            return;
-        }
-        
-        console.log(`🔄 Sincronizando ${reservasOffline.length} reservas offline...`);
-        
-        const reservasSincronizadas = [];
-        const reservasFallidas = [];
-        
-        for (const reserva of reservasOffline) {
-            try {
-                console.log(`📤 Sincronizando reserva offline: ${reserva.id}`);
-                
-                const resultado = await hacerReservaEnServidor(reserva);
-                
-                if (resultado.success) {
-                    reservasSincronizadas.push(reserva);
-                    console.log(`✅ Reserva sincronizada: ${reserva.id}`);
-                } else {
-                    reservasFallidas.push(reserva);
-                    console.warn(`⚠️ Falló sincronización: ${reserva.id}`);
-                }
-                
-            } catch (error) {
-                console.error(`❌ Error sincronizando reserva ${reserva.id}:`, error);
-                reservasFallidas.push(reserva);
-            }
-        }
-        
-        // Actualizar localStorage solo con las reservas que fallaron
-        localStorage.setItem('reservas_offline', JSON.stringify(reservasFallidas));
-        
-        if (reservasSincronizadas.length > 0) {
-            showNotification(`✅ ${reservasSincronizadas.length} reservas offline sincronizadas`, 'success');
-        }
-        
-        if (reservasFallidas.length > 0) {
-            showNotification(`⚠️ ${reservasFallidas.length} reservas pendientes de sincronización`, 'warning');
-        }
-        
-    } catch (error) {
-        console.error('❌ Error en sincronización de reservas offline:', error);
-    }
-}
+// ❌ FUNCIÓN ELIMINADA: sincronizarReservasOffline
+// RAZÓN: Las reservas ya NO se guardan offline - solo en servidor
 
 // FUNCIÓN PARA MOSTRAR ESTADÍSTICAS DE RESERVAS
 window.mostrarEstadisticasReservas = function() {
-    const reservasOffline = JSON.parse(localStorage.getItem('reservas_offline') || '[]');
     const totalEspacios = Object.keys(espaciosGlobales).length;
     const espaciosOcupados = Object.values(espaciosGlobales).reduce((total, espacios) => total + (8 - espacios), 0);
     
@@ -2053,7 +1998,7 @@ window.mostrarEstadisticasReservas = function() {
     console.log('═'.repeat(50));
     console.log(`📅 Fechas disponibles: ${totalEspacios}`);
     console.log(`🚗 Espacios ocupados: ${espaciosOcupados}`);
-    console.log(`💾 Reservas offline pendientes: ${reservasOffline.length}`);
+    console.log(`💾 Reservas: Solo en servidor (no offline)`);
     console.log(`🕐 Última sincronización: ${lastSyncTime ? lastSyncTime.toLocaleString() : 'Nunca'}`);
     console.log(`📡 Estado: ${syncStatus}`);
     console.log('═'.repeat(50));
