@@ -228,77 +228,25 @@ function setupEventListeners() {
     document.getElementById('verifyCode').addEventListener('click', handleVerifyCode);
     document.getElementById('resendCode').addEventListener('click', handleResendCode);
     
-    // 🔥 SOLUCIÓN ULTRA ROBUSTA PARA BOTÓN CONFIRMAR RESERVA
+    // ✅ CONFIGURACIÓN SIMPLE Y DIRECTA DEL BOTÓN CONFIRMAR RESERVA
     const confirmBtn = document.getElementById('confirmReservation');
     if (confirmBtn) {
-        console.log('✅ Botón confirmReservation encontrado, aplicando solución ultra robusta...');
+        console.log('✅ Botón confirmReservation encontrado - configuración simple');
         
-        // MÉTODO 1: Event listener tradicional
-        confirmBtn.addEventListener('click', handleConfirmReservation);
-        
-        // MÉTODO 2: Event listener con capture
-        confirmBtn.addEventListener('click', handleConfirmReservation, true);
-        
-        // MÉTODO 3: Event listeners múltiples para asegurar detección
-        ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend'].forEach(eventType => {
-            confirmBtn.addEventListener(eventType, function(e) {
-                if (eventType === 'click') {
-                    console.log('🔥 CLICK DETECTADO - ACTIVANDO RESERVA');
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleConfirmReservation();
-                }
-            });
+        // Event listener simple y directo
+        confirmBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('🔥 CLICK DETECTADO EN BOTÓN - Ejecutando reserva...');
+            handleConfirmReservation();
         });
         
-        // MÉTODO 4: Atributo onclick como backup
-        confirmBtn.setAttribute('onclick', 'window.handleConfirmReservationGlobal()');
-        
-        // MÉTODO 5: Forzar propiedades del botón
+        // Asegurar que esté habilitado
         confirmBtn.disabled = false;
-        confirmBtn.style.pointerEvents = 'auto';
-        confirmBtn.style.cursor = 'pointer';
         confirmBtn.removeAttribute('disabled');
         
-        // MÉTODO 6: Remover cualquier event listener previo conflictivo
-        const newBtn = confirmBtn.cloneNode(true);
-        confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
-        
-        // Re-aplicar todos los event listeners al botón limpio
-        const cleanBtn = document.getElementById('confirmReservation');
-        cleanBtn.addEventListener('click', handleConfirmReservation);
-        cleanBtn.setAttribute('onclick', 'window.handleConfirmReservationGlobal()');
-        cleanBtn.disabled = false;
-        
-        console.log('✅ Botón confirmReservation configurado con TODOS los métodos posibles');
-        
-        // Test inmediato
-        setTimeout(() => {
-            console.log('🧪 TEST AUTOMÁTICO del botón:', {
-                exists: !!document.getElementById('confirmReservation'),
-                disabled: document.getElementById('confirmReservation')?.disabled,
-                onclick: document.getElementById('confirmReservation')?.getAttribute('onclick'),
-                style: document.getElementById('confirmReservation')?.style.pointerEvents
-            });
-        }, 100);
-        
+        console.log('✅ Botón configurado correctamente');
     } else {
-        console.error('❌ ERROR CRÍTICO: No se encontró el botón confirmReservation');
-        
-        // CREAR BOTÓN COMO ÚLTIMO RECURSO
-        setTimeout(() => {
-            const pageActions = document.querySelector('#page-5 .page-actions');
-            if (pageActions && !document.getElementById('confirmReservation')) {
-                console.log('🔧 CREANDO BOTÓN MANUALMENTE...');
-                const emergencyBtn = document.createElement('button');
-                emergencyBtn.id = 'confirmReservation';
-                emergencyBtn.className = 'btn btn-success';
-                emergencyBtn.innerHTML = '<i class="fas fa-check"></i> Confirmar Reserva';
-                emergencyBtn.onclick = handleConfirmReservation;
-                pageActions.appendChild(emergencyBtn);
-                console.log('✅ Botón de emergencia creado');
-            }
-        }, 500);
+        console.error('❌ No se encontró el botón confirmReservation');
     }
     
     document.getElementById('newReservation').addEventListener('click', handleNewReservation);
@@ -371,11 +319,6 @@ function goToPage(pageNum) {
             break;
         case 5:
             generateReservationSummary();
-            // 🔥 ASEGURAR QUE EL BOTÓN ESTÉ ACTIVO EN PÁGINA 5
-            setTimeout(() => {
-                console.log('📄 Navegando a página 5 - Activando botón confirmReservation...');
-                window.forceActivateButton();
-            }, 200);
             break;
     }
 }
@@ -897,12 +840,6 @@ function generateReservationSummary() {
             <span class="summary-value">${reservationData.price}€</span>
         </div>
     `;
-    
-    // 🔥 ACTIVAR BOTÓN AUTOMÁTICAMENTE CUANDO SE GENERA EL RESUMEN
-    setTimeout(() => {
-        console.log('📋 Resumen generado - Auto-activando botón confirmReservation...');
-        window.forceActivateButton();
-    }, 100);
 }
 
 // SISTEMA DE RESERVAS UNIVERSAL SINCRONIZADO
@@ -1229,71 +1166,32 @@ window.testConfirmButton = function() {
 
 console.log('🧪 FUNCIÓN DEBUG DISPONIBLE: testConfirmButton() - Ejecutar en consola para probar botón');
 
-// 🔥 FUNCIÓN GLOBAL COMO BACKUP PARA ONCLICK
-window.handleConfirmReservationGlobal = function() {
-    console.log('🔥 FUNCIÓN GLOBAL ACTIVADA - onclick backup funcionando');
-    handleConfirmReservation();
-};
-
-// 🔧 FUNCIÓN PARA ACTIVAR BOTÓN MANUALMENTE
-window.forceActivateButton = function() {
-    console.log('🔧 FORZANDO ACTIVACIÓN DEL BOTÓN...');
-    
-    const btn = document.getElementById('confirmReservation');
-    if (btn) {
-        // Remover todos los atributos que puedan bloquear
-        btn.removeAttribute('disabled');
-        btn.disabled = false;
-        
-        // Forzar estilos
-        btn.style.pointerEvents = 'auto';
-        btn.style.cursor = 'pointer';
-        btn.style.opacity = '1';
-        btn.style.visibility = 'visible';
-        btn.style.display = 'inline-block';
-        
-        // Agregar event listener directo
-        btn.onclick = handleConfirmReservation;
-        
-        // Test inmediato
-        console.log('✅ Botón forzadamente activado. Hacer clic ahora debería funcionar.');
-        
-        return true;
-    } else {
-        console.error('❌ Botón no encontrado para activar');
-        return false;
+// 🔥 FUNCIÓN GLOBAL SIMPLE PARA ONCLICK HTML
+window.executeReservation = function() {
+    console.log('🔥 FUNCIÓN GLOBAL EJECUTADA desde onclick HTML');
+    try {
+        handleConfirmReservation();
+    } catch (error) {
+        console.error('❌ Error ejecutando reserva:', error);
+        alert('Error al procesar la reserva. Por favor, revise los datos e intente nuevamente.');
     }
 };
 
-// 🔥 AUTO-ACTIVACIÓN CUANDO SE LLEGA A LA PÁGINA 5
-window.autoActivateOnPage5 = function() {
-    const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            const page5 = document.getElementById('page-5');
-            if (page5 && page5.classList.contains('active')) {
-                console.log('📄 PÁGINA 5 DETECTADA - Auto-activando botón...');
-                setTimeout(() => {
-                    window.forceActivateButton();
-                }, 100);
-            }
-        });
+// 🔧 FUNCIÓN SIMPLE DE DEBUG
+window.debugButton = function() {
+    const btn = document.getElementById('confirmReservation');
+    console.log('🔍 DEBUG BOTÓN:', {
+        exists: !!btn,
+        disabled: btn?.disabled,
+        onclick: btn?.getAttribute('onclick'),
+        visible: btn ? window.getComputedStyle(btn).display !== 'none' : false
     });
-    
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['class']
-    });
+    return btn;
 };
 
-// Iniciar auto-activación
-window.autoActivateOnPage5();
-
-console.log('🔥 FUNCIONES BACKUP DISPONIBLES:');
-console.log('   • handleConfirmReservationGlobal() - Ejecutar reserva directamente');
-console.log('   • forceActivateButton() - Activar botón forzadamente');
-console.log('   • testConfirmButton() - Testing completo');
+console.log('🔥 FUNCIONES DISPONIBLES:');
+console.log('   • executeReservation() - Ejecutar reserva desde onclick');
+console.log('   • debugButton() - Ver estado del botón');
 
 
 

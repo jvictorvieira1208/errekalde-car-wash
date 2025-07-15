@@ -564,6 +564,19 @@ body {
     transform: none !important;
 }
 
+/* 🔥 FORZAR QUE EL BOTÓN CONFIRMAR RESERVA SIEMPRE SEA CLICKEABLE */
+#confirmReservation {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    z-index: 9999 !important;
+    position: relative !important;
+}
+
+#confirmReservation:not(:disabled) {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
 /* Acciones de página */
 .page-actions {
     display: flex;
