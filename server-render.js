@@ -101,6 +101,159 @@ app.get('/api/espacios', async (req, res) => {
     }
 });
 
+// CREAR RESERVA + NOTIFICACIÓN N8N (UNA SOLA VEZ)
+app.post('/api/reservas', async (req, res) => {
+    try {
+        console.log('📝 Nueva reserva recibida:', req.body);
+        
+        if (!db) {
+            return res.status(500).json({ error: 'Base de datos no disponible' });
+        }
+        
+        const {
+            fecha,
+            nombre,
+            telefono,
+            marca_vehiculo,
+            modelo_vehiculo,
+            tamano_vehiculo,
+            servicios,
+            precio_total,
+            notas
+        } = req.body;
+        
+        // Generar ID único para la reserva
+        const reservationId = `RESERVA-${Date.now()}`;
+        
+        // Crear tabla de reservas si no existe
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS reservas (
+                id SERIAL PRIMARY KEY,
+                reservation_id VARCHAR(50) UNIQUE NOT NULL,
+                fecha DATE NOT NULL,
+                nombre VARCHAR(100) NOT NULL,
+                telefono VARCHAR(20) NOT NULL,
+                marca_vehiculo VARCHAR(50),
+                modelo_vehiculo VARCHAR(50),
+                tamano_vehiculo VARCHAR(20),
+                servicios TEXT,
+                precio_total DECIMAL(10,2) NOT NULL,
+                notas TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        
+        // Insertar reserva en la base de datos
+        await db.query(`
+            INSERT INTO reservas (
+                reservation_id, fecha, nombre, telefono, marca_vehiculo, 
+                modelo_vehiculo, tamano_vehiculo, servicios, precio_total, notas
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `, [
+            reservationId, fecha, nombre, telefono, marca_vehiculo,
+            modelo_vehiculo, tamano_vehiculo, servicios, precio_total, notas
+        ]);
+        
+        console.log(`✅ Reserva ${reservationId} guardada en BD`);
+        
+        // Formatear datos para n8n
+        const vehicle = marca_vehiculo && modelo_vehiculo ? 
+            `${marca_vehiculo} ${modelo_vehiculo}` : 
+            (marca_vehiculo || modelo_vehiculo || 'Sin especificar');
+            
+        const vehicleSizeText = tamano_vehiculo === 'large' ? 'grande' : 
+                               tamano_vehiculo === 'medium' ? 'mediano' : 'pequeño';
+        
+        // Crear mensaje de confirmación
+        const message = `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗
+
+✅ Hola ${nombre}, tu reserva está confirmada
+
+📅 *Fecha:* ${fecha}
+🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón
+
+👤 *Cliente:* ${nombre}
+📞 *Teléfono:* ${telefono}
+🚗 *Vehículo:* ${vehicle} (${vehicleSizeText})
+🧽 *Servicio:* ${servicios}
+💰 *Precio Total:* ${precio_total}€
+🆔 *ID Reserva:* ${reservationId}
+${notas ? `📝 *Notas adicionales:* ${notas}` : ''}
+
+📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*
+🏢 *Ubicación:* Pabellón SWAP ENERGIA
+🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00
+🕐 *No hay horario específico de lavado*
+
+*¡Gracias por usar nuestro servicio!* 🤝
+
+_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`;
+
+        // Datos para enviar a n8n (UNA SOLA VEZ)
+        const n8nData = {
+            phone: telefono,
+            message: message,
+            type: 'booking',
+            reservationId: reservationId,
+            reservationData: {
+                name: nombre,
+                phone: telefono,
+                date: fecha,
+                vehicle: vehicle,
+                services: servicios,
+                price: precio_total,
+                vehicleSize: tamano_vehiculo,
+                notes: notas || ''
+            }
+        };
+        
+        // Enviar a n8n (UNA SOLA VEZ)
+        const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
+        
+        try {
+            const fetch = (await import('node-fetch')).default;
+            const response = await fetch(N8N_WEBHOOK_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(n8nData)
+            });
+            
+            if (response.ok) {
+                console.log(`✅ Notificación enviada a n8n para reserva ${reservationId}`);
+            } else {
+                console.error(`❌ Error enviando a n8n: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('❌ Error enviando a n8n:', error.message);
+        }
+        
+        // Responder al cliente
+        res.json({
+            success: true,
+            message: 'Reserva creada exitosamente',
+            reservationId: reservationId,
+            data: {
+                nombre,
+                telefono,
+                fecha,
+                vehicle,
+                servicios,
+                precio_total
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error creando reserva:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno del servidor',
+            message: error.message
+        });
+    }
+});
+
 // INICIALIZACIÓN SÚPER SIMPLE
 async function iniciarServidor() {
     console.log('🚀 Iniciando servidor MÍNIMO...');
