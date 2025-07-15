@@ -381,16 +381,32 @@ app.post('/api/reservas', async (req, res) => {
             console.log('ℹ️ Columna reservation_id ya existe o error menor:', alterError.message);
         }
         
-        // Insertar reserva en la base de datos
-        await db.query(`
-            INSERT INTO reservas (
-                reservation_id, fecha, nombre, telefono, marca_vehiculo, 
+        // Insertar reserva - usar esquema compatible
+        try {
+            // Intentar con reservation_id primero
+            await db.query(`
+                INSERT INTO reservas (
+                    reservation_id, fecha, nombre, telefono, marca_vehiculo, 
+                    modelo_vehiculo, tamano_vehiculo, servicios, precio_total, notas
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            `, [
+                reservationId, fecha, nombre, telefono, marca_vehiculo,
                 modelo_vehiculo, tamano_vehiculo, servicios, precio_total, notas
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        `, [
-            reservationId, fecha, nombre, telefono, marca_vehiculo,
-            modelo_vehiculo, tamano_vehiculo, servicios, precio_total, notas
-        ]);
+            ]);
+        } catch (insertError) {
+            console.log('⚠️ Esquema antiguo detectado, usando compatibilidad...');
+            // Fallback: usar esquema sin reservation_id
+            await db.query(`
+                INSERT INTO reservas (
+                    fecha, nombre, telefono, marca_vehiculo, 
+                    modelo_vehiculo, tamano_vehiculo, servicios, precio_total, notas
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            `, [
+                fecha, nombre, telefono, marca_vehiculo,
+                modelo_vehiculo, tamano_vehiculo, servicios, precio_total, notas
+            ]);
+            console.log('✅ Reserva insertada con esquema compatible');
+        }
         
         console.log(`✅ Reserva ${reservationId} guardada en BD`);
         
