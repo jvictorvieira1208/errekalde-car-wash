@@ -297,6 +297,7 @@ app.post('/api/test-n8n', async (req, res) => {
         
         // Datos de prueba con formato EXACTO requerido
         const testData = {
+            body: "+34626327017",  // N8N espera el teléfono en 'body' para hacer .replace('+','')
             phone: "+34626327017",
             message: `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗\n\n✅ Hola Joao, tu reserva está confirmada\n\n📅 *Fecha:* miércoles, 16 de julio de 2025\n🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón\n\n👤 *Cliente:* Joao\n📞 *Teléfono:* +34626327017\n🚗 *Vehículo:* audi a8 (grande)\n🧽 *Servicio:* Limpieza interior 25 + Un faro 35\n✨ *Suplementos:* Un faro\n💰 *Precio Total:* 60€\n🆔 *ID Reserva:* ${testReservationId}\n\n📝 *Notas adicionales:* hola\n\n📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*\n🏢 *Ubicación:* Pabellón SWAP ENERGIA\n🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00\n🕐 *No hay horario específico de lavado*\n\n*¡Gracias por usar nuestro servicio!* 🤝\n\n_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`,
             type: 'booking',
@@ -523,6 +524,7 @@ app.post('/api/reservas', async (req, res) => {
 
         // 🔥 FORMATO EXACTO SEGÚN ESPECIFICACIÓN DEL USUARIO - WHATSAPP BUSINESS CLOUD3
         const n8nData = {
+            body: telefono,  // N8N espera el teléfono en 'body' para hacer .replace('+','')
             phone: telefono,
             message: message,
             type: 'booking',
