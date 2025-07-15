@@ -49,11 +49,11 @@ const VEHICLE_DATABASE = {
 // Configuración de n8n
 const N8N_WEBHOOK_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
 
-// CONFIGURACIÓN DE SINCRONIZACIÓN EN TIEMPO REAL
+// CONFIGURACIÓN DE SINCRONIZACIÓN EN TIEMPO REAL (AGRESIVA)
 const SYNC_CONFIG = {
-    INTERVAL_FAST: 10000,  // 10 segundos cuando hay actividad
-    INTERVAL_NORMAL: 30000, // 30 segundos normal  
-    INTERVAL_SLOW: 60000,   // 1 minuto cuando está inactivo
+    INTERVAL_FAST: 5000,   // 5 segundos cuando hay actividad reciente
+    INTERVAL_NORMAL: 15000, // 15 segundos normal  
+    INTERVAL_SLOW: 30000,   // 30 segundos cuando está inactivo
     MAX_SYNC_ATTEMPTS: 3
 };
 
@@ -1585,11 +1585,15 @@ async function hacerReservaEnServidor(reservaData) {
                     console.log(`📊 SINCRONIZACIÓN AUTOMÁTICA: ${fechaStr}`);
                     console.log(`   • Espacios anteriores: ${espaciosAnteriores}`);
                     console.log(`   • Espacios actuales: ${data.espaciosRestantes}`);
+                    console.log(`   • Estado espaciosGlobales:`, espaciosGlobales);
                     
                     // Actualizar interfaz inmediatamente
                     actualizarInterfazConEspacios();
                     
-                    showNotification(`🔄 Espacios sincronizados: ${data.espaciosRestantes} disponibles`, 'info');
+                    // Actualizar también localStorage para persistencia
+                    localStorage.setItem('espaciosGlobales', JSON.stringify(espaciosGlobales));
+                    
+                    showNotification(`🔄 Espacios actualizados: ${data.espaciosRestantes} disponibles para ${fechaStr}`, 'success');
                 }
                 
                 // Información de sincronización para otros dispositivos
@@ -1966,18 +1970,15 @@ async function sincronizarEspaciosUniversal() {
                     if (backendData.success && backendData.espacios) {
                         console.log('✅ Sincronización exitosa con backend centralizado (nuevos endpoints)');
                         
-                        // Convertir formato del backend al formato frontend
-                        const espaciosFormateados = {};
-                        Object.keys(backendData.espacios).forEach(fecha => {
-                            espaciosFormateados[fecha] = backendData.espacios[fecha].disponibles || 8;
-                        });
-                        
-                        espaciosGlobales = espaciosFormateados;
+                        // Los espacios ya vienen en el formato correcto (fecha: número)
+                        espaciosGlobales = backendData.espacios;
                         actualizarInterfazConEspacios();
                         updateSyncStatus('conectado');
                         lastSyncTime = Date.now();
                         
-                        console.log(`📊 Espacios sincronizados: ${Object.keys(espaciosFormateados).length} fechas`);
+                        console.log(`📊 Espacios sincronizados: ${Object.keys(espaciosGlobales).length} fechas`);
+                        console.log('📋 Detalle espacios:', espaciosGlobales);
+                        
                         showNotification('🔄 Espacios sincronizados en tiempo real', 'success');
                         return;
                     }
@@ -2455,41 +2456,63 @@ function ajustarFrecuenciaSincronizacion() {
     }
 }
 
-// Función de sincronización automática (silenciosa)
+// Función de sincronización automática (mejorada)
 async function sincronizarEspaciosAutomatico() {
     try {
-        // No mostrar indicadores visuales en sincronización automática
+        // Usar el endpoint principal de espacios para sincronización automática
         if (SERVER_URL) {
-            const response = await fetch(`${SERVER_URL}/api/sync-espacios`, {
+            const response = await fetch(`${SERVER_URL}/api/espacios`, {
                 method: 'GET',
-                headers: { 'Cache-Control': 'no-cache' }
+                headers: { 
+                    'Cache-Control': 'no-cache',
+                    'X-Sync-Auto': 'true'
+                }
             });
             
             if (response.ok) {
                 const data = await response.json();
                 
-                if (data.success && data.cambios > 0) {
-                    console.log(`🔄 Cambios detectados automáticamente: ${data.cambios} actualizaciones`);
+                if (data.success && data.espacios) {
+                    // Detectar si hay cambios comparando con el estado actual
+                    const cambiosDetectados = [];
+                    let hayDiferencias = false;
                     
-                    // Actualizar espacios solo si hay cambios
-                    const espaciosAnteriores = { ...espaciosGlobales };
-                    
-                    data.espacios.forEach(espacio => {
-                        const fechaStr = espacio.fecha.split('T')[0];
-                        const nuevosEspacios = espacio.espacios_disponibles;
+                    Object.keys(data.espacios).forEach(fecha => {
+                        const espaciosNuevos = data.espacios[fecha];
+                        const espaciosActuales = espaciosGlobales[fecha];
                         
-                        if (espaciosGlobales[fechaStr] !== nuevosEspacios) {
-                            console.log(`📊 ${fechaStr}: ${espaciosGlobales[fechaStr] || 8} → ${nuevosEspacios}`);
-                            espaciosGlobales[fechaStr] = nuevosEspacios;
+                        if (espaciosActuales !== espaciosNuevos) {
+                            cambiosDetectados.push({
+                                fecha,
+                                anterior: espaciosActuales || 8,
+                                nuevo: espaciosNuevos
+                            });
+                            hayDiferencias = true;
                         }
                     });
                     
-                    // Actualizar interfaz solo si hay diferencias
-                    actualizarInterfazConEspacios();
-                    
-                    // Notificación discreta
-                    showNotification('🔄 Espacios actualizados automáticamente', 'info', 2000);
+                    if (hayDiferencias) {
+                        console.log(`🔄 Cambios detectados automáticamente:`, cambiosDetectados);
+                        
+                        // Actualizar espacios globales
+                        espaciosGlobales = { ...espaciosGlobales, ...data.espacios };
+                        
+                        // Actualizar interfaz
+                        actualizarInterfazConEspacios();
+                        
+                        // Actualizar localStorage
+                        localStorage.setItem('espaciosGlobales', JSON.stringify(espaciosGlobales));
+                        
+                        // Notificación discreta solo si hay muchos cambios
+                        if (cambiosDetectados.length > 1) {
+                            showNotification(`🔄 ${cambiosDetectados.length} espacios actualizados automáticamente`, 'info', 3000);
+                        }
+                    }
+                } else {
+                    console.warn('⚠️ Respuesta de sincronización sin datos válidos:', data);
                 }
+            } else {
+                console.warn('⚠️ Error en sincronización automática:', response.status);
             }
         }
     } catch (error) {
