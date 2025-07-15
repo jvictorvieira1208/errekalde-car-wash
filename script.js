@@ -2020,12 +2020,10 @@ async function sincronizarEspaciosUniversal() {
                         espaciosGlobales = backendData.espacios;
                         actualizarInterfazConEspacios();
                         updateSyncStatus('conectado');
-                        lastSyncTime = Date.now();
+                        syncRetryCount = 0;
+                        lastSyncTime = new Date();
                         
                         console.log(`📊 Espacios sincronizados: ${Object.keys(espaciosGlobales).length} fechas`);
-                        console.log('📋 Detalle espacios:', espaciosGlobales);
-                        
-                        showNotification('🔄 Espacios sincronizados en tiempo real', 'success');
                         return;
                     }
                 }
@@ -2046,92 +2044,21 @@ async function sincronizarEspaciosUniversal() {
             console.log('⚠️ No hay datos locales disponibles');
             updateSyncStatus('desconectado');
             return;
-                 }
-     } catch (error) {
-         console.error('❌ Error en sincronización universal:', error.message);
-         syncRetryCount++;
-         
-         if (syncRetryCount <= MAX_SYNC_RETRIES) {
-             updateSyncStatus('reintentando');
-             console.log(`🔄 Reintentando sincronización en 10 segundos (intento ${syncRetryCount}/${MAX_SYNC_RETRIES})`);
-             setTimeout(sincronizarEspaciosUniversal, 10000);
-         } else {
-             updateSyncStatus('desconectado');
-             console.log('❌ Máximo número de reintentos alcanzado');
-         }
-     }
- }
-            console.log('📦 Respuesta universal:', data);
-            
-            // PASO 2: Verificar si hay espacios actualizados en la respuesta
-            let espaciosActualizados = null;
-            
-            // Buscar espacios en diferentes formatos de respuesta
-            if (data && data.espacios && typeof data.espacios === 'object') {
-                espaciosActualizados = data.espacios;
-            } else if (data && data.spaces && typeof data.spaces === 'object') {
-                espaciosActualizados = data.spaces;
-            } else if (data && data.data && data.data.espacios) {
-                espaciosActualizados = data.data.espacios;
-            }
-            
-            // PASO 3: Si no hay datos de espacios en N8N, usar los datos locales actuales
-            if (!espaciosActualizados) {
-                console.log('ℹ️ N8N no devolvió espacios, manteniendo datos locales');
-                espaciosActualizados = espaciosGlobales;
-            }
-            
-            // PASO 4: Detectar y aplicar cambios
-            const newHash = JSON.stringify(espaciosActualizados);
-            const hasChanges = newHash !== lastSpacesHash;
-            
-            if (hasChanges) {
-                console.log('🔄 Cambios detectados en espacios universales');
-                
-                // Detectar cambios específicos
-                const espaciosAnteriores = { ...espaciosGlobales };
-                espaciosGlobales = espaciosActualizados;
-                
-                // Mostrar qué cambió
-                Object.keys(espaciosActualizados).forEach(fecha => {
-                    if (espaciosAnteriores[fecha] !== espaciosActualizados[fecha]) {
-                        console.log(`📅 ${fecha}: ${espaciosAnteriores[fecha] || 8} → ${espaciosActualizados[fecha]}`);
-                    }
-                });
-                
-                // Actualizar interfaz
-                actualizarInterfazConEspacios();
-                lastSpacesHash = newHash;
-                
-                showNotification('🔄 Espacios actualizados desde otro dispositivo', 'info');
-            } else {
-                console.log('ℹ️ Sin cambios en espacios universales');
-            }
-            
-            lastSyncTime = new Date();
-            updateSyncStatus('conectado');
-            syncRetryCount = 0;
-            
-        } else {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
     } catch (error) {
-        console.error('❌ Error en sincronización universal:', error);
+        console.error('❌ Error en sincronización universal:', error.message);
         syncRetryCount++;
         
         if (syncRetryCount <= MAX_SYNC_RETRIES) {
             updateSyncStatus('reintentando');
-            
-            const retryDelay = Math.min(3000 * Math.pow(2, syncRetryCount - 1), 15000);
-            setTimeout(() => {
-                console.log(`🔄 Reintentando sincronización en ${retryDelay/1000}s...`);
-                sincronizarEspaciosUniversal();
-            }, retryDelay);
+            console.log(`🔄 Reintentando sincronización en 10 segundos (intento ${syncRetryCount}/${MAX_SYNC_RETRIES})`);
+            setTimeout(sincronizarEspaciosUniversal, 10000);
         } else {
             updateSyncStatus('desconectado');
+            console.log('❌ Máximo número de reintentos alcanzado');
             
-            // Reset después de 30 segundos en lugar de 60
+            // Reset después de 30 segundos
             setTimeout(() => {
                 syncRetryCount = 0;
                 console.log('🔄 Reiniciando contador de reintentos');
