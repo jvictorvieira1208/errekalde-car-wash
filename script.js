@@ -227,7 +227,29 @@ function setupEventListeners() {
     document.getElementById('sendCode').addEventListener('click', handleSendCode);
     document.getElementById('verifyCode').addEventListener('click', handleVerifyCode);
     document.getElementById('resendCode').addEventListener('click', handleResendCode);
-    document.getElementById('confirmReservation').addEventListener('click', handleConfirmReservation);
+    
+    // ✅ EVENT LISTENER PRINCIPAL + BACKUP PARA CONFIRMAR RESERVA
+    const confirmBtn = document.getElementById('confirmReservation');
+    if (confirmBtn) {
+        console.log('✅ Botón confirmReservation encontrado, configurando event listeners...');
+        confirmBtn.addEventListener('click', handleConfirmReservation);
+        
+        // BACKUP: Event listener adicional para debug
+        confirmBtn.addEventListener('click', function(e) {
+            console.log('🔥 CLICK DETECTADO EN BOTÓN CONFIRMAR RESERVA');
+            console.log('   • Target:', e.target);
+            console.log('   • Disabled:', confirmBtn.disabled);
+            console.log('   • Display:', window.getComputedStyle(confirmBtn).display);
+            console.log('   • Visibility:', window.getComputedStyle(confirmBtn).visibility);
+        });
+        
+        // Asegurar que no esté deshabilitado
+        confirmBtn.disabled = false;
+        console.log('✅ Botón confirmReservation habilitado y configurado');
+    } else {
+        console.error('❌ ERROR: No se encontró el botón confirmReservation');
+    }
+    
     document.getElementById('newReservation').addEventListener('click', handleNewReservation);
 
     // Detección de tamaño de vehículo
@@ -824,11 +846,21 @@ function generateReservationSummary() {
 // SISTEMA DE RESERVAS UNIVERSAL SINCRONIZADO
 async function handleConfirmReservation() {
     console.log('🎯 INICIANDO RESERVA UNIVERSAL SINCRONIZADA');
+    console.log('✅ BOTÓN CONFIRMRESERVATION FUNCIONANDO - Event listener conectado correctamente');
     
     if (!selectedDate || !isVerified) {
         showNotification('❌ Fecha no seleccionada o teléfono no verificado', 'error');
+        console.log('❌ VALIDACIÓN FALLIDA:', { selectedDate, isVerified });
         return;
     }
+    
+    console.log('✅ VALIDACIONES PASADAS, continuando con reserva...');
+    console.log('📊 DATOS ESTADO:', { 
+        selectedDate: selectedDate ? selectedDate.toDateString() : 'null',
+        isVerified,
+        reservationData: reservationData,
+        espaciosGlobales: Object.keys(espaciosGlobales).length
+    });
     
     isReservationInProgress = true;
     updateSyncStatus('sincronizando');
