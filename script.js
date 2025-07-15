@@ -48,6 +48,18 @@ const VEHICLE_DATABASE = {
 
 // Configuración de n8n
 const N8N_WEBHOOK_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
+
+// CONFIGURACIÓN DE SINCRONIZACIÓN EN TIEMPO REAL
+const SYNC_CONFIG = {
+    INTERVAL_FAST: 10000,  // 10 segundos cuando hay actividad
+    INTERVAL_NORMAL: 30000, // 30 segundos normal  
+    INTERVAL_SLOW: 60000,   // 1 minuto cuando está inactivo
+    MAX_SYNC_ATTEMPTS: 3
+};
+
+// Variables de sincronización (usando las existentes)
+let lastUserActivity = Date.now();
+let currentSyncMode = 'normal';
 const N8N_VALIDATION_URL = 'https://n8nserver.swapenergia.com/webhook/validarNúmero';
 const N8N_SYNC_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash-sync';
 const N8N_SPACES_URL = 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash'; // USAR EL QUE FUNCIONA
@@ -1564,16 +1576,40 @@ async function hacerReservaEnServidor(reservaData) {
             if (data.success) {
                 console.log('✅ Reserva creada exitosamente - Backend maneja BD + N8N automáticamente');
                 
-                // Actualizar espacios locales inmediatamente
-                if (espaciosGlobales[reservaData.fecha]) {
-                    espaciosGlobales[reservaData.fecha] = Math.max(0, espaciosGlobales[reservaData.fecha] - 1);
+                // 🔥 SINCRONIZACIÓN AUTOMÁTICA: Usar datos del backend
+                if (data.espaciosRestantes !== undefined) {
+                    const fechaStr = reservaData.fecha;
+                    const espaciosAnteriores = espaciosGlobales[fechaStr] || 8;
+                    espaciosGlobales[fechaStr] = data.espaciosRestantes;
+                    
+                    console.log(`📊 SINCRONIZACIÓN AUTOMÁTICA: ${fechaStr}`);
+                    console.log(`   • Espacios anteriores: ${espaciosAnteriores}`);
+                    console.log(`   • Espacios actuales: ${data.espaciosRestantes}`);
+                    
+                    // Actualizar interfaz inmediatamente
+                    actualizarInterfazConEspacios();
+                    
+                    showNotification(`🔄 Espacios sincronizados: ${data.espaciosRestantes} disponibles`, 'info');
+                }
+                
+                // Información de sincronización para otros dispositivos
+                if (data.sync) {
+                    console.log('📡 Datos de sincronización:', data.sync);
+                    
+                    // Forzar sincronización en otros dispositivos después de un breve delay
+                    setTimeout(async () => {
+                        console.log('📢 Activando sincronización en red...');
+                        await sincronizarEspaciosUniversal();
+                    }, 2000);
                 }
                 
                 return {
                     success: true,
                     message: 'Reserva creada exitosamente',
                     reservationId: data.reservationId,
-                    data: data.data
+                    data: data.data,
+                    espaciosRestantes: data.espaciosRestantes,
+                    sync: data.sync
                 };
             } else {
                 throw new Error(data.message || 'Error en la reserva');
@@ -1910,11 +1946,13 @@ async function sincronizarEspaciosUniversal() {
         console.log('🔄 SINCRONIZACIÓN SÚPER ROBUSTA ACTIVADA...');
         updateSyncStatus('sincronizando');
         
-        // PASO 1: Intentar backend centralizado PRIMERO
+        // PASO 1: Intentar backend centralizado PRIMERO (NUEVO SISTEMA DE ESPACIOS)
         if (SERVER_URL) {
             try {
-                console.log('🌐 Intentando backend centralizado:', SERVER_URL);
-                const backendResponse = await fetch(`${SERVER_URL}/api/sync-espacios`, {
+                console.log('🌐 Intentando backend centralizado con nuevos endpoints:', SERVER_URL);
+                
+                // Usar el nuevo endpoint de espacios mejorado
+                const backendResponse = await fetch(`${SERVER_URL}/api/espacios`, {
                     method: 'GET',
                     headers: {
                         'Cache-Control': 'no-cache',
@@ -1924,17 +1962,28 @@ async function sincronizarEspaciosUniversal() {
                 
                 if (backendResponse.ok) {
                     const backendData = await backendResponse.json();
-                    if (backendData.espacios) {
-                        console.log('✅ Sincronización exitosa con backend centralizado');
-                        espaciosGlobales = backendData.espacios;
+                    
+                    if (backendData.success && backendData.espacios) {
+                        console.log('✅ Sincronización exitosa con backend centralizado (nuevos endpoints)');
+                        
+                        // Convertir formato del backend al formato frontend
+                        const espaciosFormateados = {};
+                        Object.keys(backendData.espacios).forEach(fecha => {
+                            espaciosFormateados[fecha] = backendData.espacios[fecha].disponibles || 8;
+                        });
+                        
+                        espaciosGlobales = espaciosFormateados;
                         actualizarInterfazConEspacios();
                         updateSyncStatus('conectado');
                         lastSyncTime = Date.now();
+                        
+                        console.log(`📊 Espacios sincronizados: ${Object.keys(espaciosFormateados).length} fechas`);
+                        showNotification('🔄 Espacios sincronizados en tiempo real', 'success');
                         return;
                     }
                 }
             } catch (backendError) {
-                console.log('⚠️ Backend centralizado no disponible, intentando N8N...');
+                console.log('⚠️ Backend centralizado no disponible, intentando N8N...', backendError.message);
             }
         }
         
@@ -2347,3 +2396,121 @@ window.detectarDesincronizacion = async function() {
 };
 
 // ===== SISTEMA DE SINCRONIZACIÓN VERDADERA CON N8N =====
+
+// ====== SISTEMA DE SINCRONIZACIÓN AUTOMÁTICA EN TIEMPO REAL ======
+
+// Función para inicializar sincronización automática
+function iniciarSincronizacionAutomatica() {
+    console.log('🔄 Iniciando sincronización automática en tiempo real...');
+    
+    // Detectar actividad del usuario para ajustar frecuencia de sincronización
+    ['click', 'keydown', 'touchstart', 'mousemove'].forEach(event => {
+        document.addEventListener(event, () => {
+            lastUserActivity = Date.now();
+            ajustarFrecuenciaSincronizacion();
+        }, { passive: true });
+    });
+    
+    // Iniciar polling adaptativo
+    ajustarFrecuenciaSincronizacion();
+    
+    // Sincronización cuando la ventana recupera el foco
+    window.addEventListener('focus', () => {
+        console.log('👁️ Ventana activa, sincronizando...');
+        sincronizarEspaciosUniversal();
+    });
+    
+    // Sincronización antes de que el usuario se vaya
+    window.addEventListener('beforeunload', () => {
+        if (syncInterval) {
+            clearInterval(syncInterval);
+        }
+    });
+}
+
+// Ajustar frecuencia de sincronización según actividad
+function ajustarFrecuenciaSincronizacion() {
+    const tiempoInactivo = Date.now() - lastUserActivity;
+    let nuevoIntervalo = SYNC_CONFIG.INTERVAL_NORMAL;
+    let nuevoModo = 'normal';
+    
+    if (tiempoInactivo < 30000) { // Activo en últimos 30 segundos
+        nuevoIntervalo = SYNC_CONFIG.INTERVAL_FAST;
+        nuevoModo = 'fast';
+    } else if (tiempoInactivo > 300000) { // Inactivo por más de 5 minutos
+        nuevoIntervalo = SYNC_CONFIG.INTERVAL_SLOW;
+        nuevoModo = 'slow';
+    }
+    
+    // Solo cambiar si es diferente
+    if (nuevoModo !== currentSyncMode) {
+        if (syncInterval) {
+            clearInterval(syncInterval);
+        }
+        
+        currentSyncMode = nuevoModo;
+        syncInterval = setInterval(sincronizarEspaciosAutomatico, nuevoIntervalo);
+        
+        console.log(`⏱️ Sincronización ajustada a modo: ${nuevoModo} (${nuevoIntervalo}ms)`);
+    }
+}
+
+// Función de sincronización automática (silenciosa)
+async function sincronizarEspaciosAutomatico() {
+    try {
+        // No mostrar indicadores visuales en sincronización automática
+        if (SERVER_URL) {
+            const response = await fetch(`${SERVER_URL}/api/sync-espacios`, {
+                method: 'GET',
+                headers: { 'Cache-Control': 'no-cache' }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                if (data.success && data.cambios > 0) {
+                    console.log(`🔄 Cambios detectados automáticamente: ${data.cambios} actualizaciones`);
+                    
+                    // Actualizar espacios solo si hay cambios
+                    const espaciosAnteriores = { ...espaciosGlobales };
+                    
+                    data.espacios.forEach(espacio => {
+                        const fechaStr = espacio.fecha.split('T')[0];
+                        const nuevosEspacios = espacio.espacios_disponibles;
+                        
+                        if (espaciosGlobales[fechaStr] !== nuevosEspacios) {
+                            console.log(`📊 ${fechaStr}: ${espaciosGlobales[fechaStr] || 8} → ${nuevosEspacios}`);
+                            espaciosGlobales[fechaStr] = nuevosEspacios;
+                        }
+                    });
+                    
+                    // Actualizar interfaz solo si hay diferencias
+                    actualizarInterfazConEspacios();
+                    
+                    // Notificación discreta
+                    showNotification('🔄 Espacios actualizados automáticamente', 'info', 2000);
+                }
+            }
+        }
+    } catch (error) {
+        // Fallos silenciosos en sincronización automática
+        console.warn('⚠️ Fallo silencioso en sincronización automática:', error.message);
+    }
+}
+
+// Modificar la inicialización existente para incluir sincronización automática
+const originalInicializarSistema = window.inicializarSistema;
+if (typeof originalInicializarSistema === 'function') {
+    window.inicializarSistema = async function() {
+        await originalInicializarSistema();
+        iniciarSincronizacionAutomatica();
+    };
+} else {
+    // Si no existe, crear función de inicialización
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof inicializarSistema === 'function') {
+            inicializarSistema();
+        }
+        iniciarSincronizacionAutomatica();
+    });
+}

@@ -70,11 +70,16 @@ if (DB_TYPE === 'postgresql' && process.env.DATABASE_URL) {
     };
 }
 
-// ENDPOINT SIMPLE CON BD
+// ENDPOINT MEJORADO PARA ESPACIOS CON SINCRONIZACIÓN
 app.get('/api/espacios', async (req, res) => {
     try {
         if (!db) {
-            return res.json({ message: 'Base de datos no configurada, pero servidor funcionando' });
+            return res.json({ 
+                success: false,
+                message: 'Base de datos no configurada',
+                espacios: {},
+                timestamp: new Date().toISOString()
+            });
         }
         
         // Crear tabla si no existe
@@ -82,24 +87,139 @@ app.get('/api/espacios', async (req, res) => {
             CREATE TABLE IF NOT EXISTS espacios_disponibles (
                 id SERIAL PRIMARY KEY,
                 fecha DATE NOT NULL UNIQUE,
-                espacios_disponibles INTEGER NOT NULL DEFAULT 8
+                espacios_disponibles INTEGER NOT NULL DEFAULT 8,
+                espacios_totales INTEGER NOT NULL DEFAULT 8,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
         
-        // Obtener espacios
-        const espacios = await db.query('SELECT * FROM espacios_disponibles ORDER BY fecha LIMIT 10;');
+        // Obtener espacios (próximos 30 días de miércoles)
+        const espacios = await db.query(`
+            SELECT fecha, espacios_disponibles, espacios_totales, updated_at 
+            FROM espacios_disponibles 
+            WHERE fecha >= CURRENT_DATE 
+            ORDER BY fecha 
+            LIMIT 20
+        `);
+        
+        // Formatear para frontend (objeto con fechas como keys)
+        const espaciosFormateados = {};
+        espacios.forEach(espacio => {
+            const fechaStr = espacio.fecha.toISOString().split('T')[0];
+            espaciosFormateados[fechaStr] = {
+                disponibles: espacio.espacios_disponibles,
+                totales: espacio.espacios_totales || 8,
+                actualizado: espacio.updated_at
+            };
+        });
         
         res.json({
             success: true,
-            espacios: espacios || [],
-            message: 'Espacios obtenidos exitosamente'
+            espacios: espaciosFormateados,
+            timestamp: new Date().toISOString(),
+            message: 'Espacios sincronizados exitosamente'
         });
+        
     } catch (error) {
         console.error('Error en /api/espacios:', error.message);
         res.json({
             success: false,
-            message: 'Error en BD, pero servidor funcionando',
-            error: error.message
+            message: 'Error obteniendo espacios',
+            error: error.message,
+            espacios: {},
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// ENDPOINT PARA SINCRONIZACIÓN EN TIEMPO REAL
+app.get('/api/sync-espacios', async (req, res) => {
+    try {
+        if (!db) {
+            return res.json({ success: false, message: 'BD no disponible' });
+        }
+        
+        const { desde } = req.query;
+        let filtroFecha = '';
+        let params = [];
+        
+        if (desde) {
+            filtroFecha = 'WHERE updated_at > $1';
+            params.push(desde);
+        }
+        
+        const espacios = await db.query(`
+            SELECT fecha, espacios_disponibles, espacios_totales, updated_at 
+            FROM espacios_disponibles 
+            ${filtroFecha}
+            ORDER BY updated_at DESC
+        `, params);
+        
+        res.json({
+            success: true,
+            cambios: espacios.length,
+            espacios: espacios,
+            timestamp: new Date().toISOString(),
+            message: espacios.length > 0 ? 'Cambios detectados' : 'Sin cambios'
+        });
+        
+    } catch (error) {
+        console.error('Error en sync:', error.message);
+        res.json({
+            success: false,
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// ENDPOINT PARA ESPACIOS DE UNA FECHA ESPECÍFICA
+app.get('/api/espacios/:fecha', async (req, res) => {
+    try {
+        const { fecha } = req.params;
+        
+        if (!db) {
+            return res.json({ 
+                success: false, 
+                espacios_disponibles: 8,
+                message: 'BD no disponible, usando valor por defecto'
+            });
+        }
+        
+        // Obtener o crear espacios para la fecha
+        let espacios = await db.query(`
+            SELECT espacios_disponibles, espacios_totales, updated_at
+            FROM espacios_disponibles 
+            WHERE fecha = $1
+        `, [fecha]);
+        
+        if (espacios.length === 0) {
+            // Crear entrada para fecha nueva
+            await db.query(`
+                INSERT INTO espacios_disponibles (fecha, espacios_disponibles, espacios_totales, updated_at)
+                VALUES ($1, 8, 8, CURRENT_TIMESTAMP)
+            `, [fecha]);
+            
+            espacios = [{ espacios_disponibles: 8, espacios_totales: 8, updated_at: new Date() }];
+        }
+        
+        res.json({
+            success: true,
+            fecha: fecha,
+            espacios_disponibles: espacios[0].espacios_disponibles,
+            espacios_totales: espacios[0].espacios_totales || 8,
+            actualizado: espacios[0].updated_at,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error(`Error obteniendo espacios para ${req.params.fecha}:`, error.message);
+        res.json({
+            success: false,
+            fecha: req.params.fecha,
+            espacios_disponibles: 8,
+            error: error.message,
+            timestamp: new Date().toISOString()
         });
     }
 });
@@ -226,6 +346,21 @@ app.post('/api/reservas', async (req, res) => {
         
         console.log(`✅ Reserva ${reservationId} guardada en BD`);
         
+        // 🔥 DISMINUIR ESPACIOS DISPONIBLES (CRÍTICO)
+        await db.query(`
+            UPDATE espacios_disponibles 
+            SET espacios_disponibles = GREATEST(espacios_disponibles - 1, 0)
+            WHERE fecha = $1
+        `, [fecha]);
+        
+        // Verificar espacios restantes
+        const espaciosRestantes = await db.query(`
+            SELECT espacios_disponibles FROM espacios_disponibles WHERE fecha = $1
+        `, [fecha]);
+        
+        const espaciosActuales = espaciosRestantes[0]?.espacios_disponibles || 0;
+        console.log(`📊 Espacios restantes para ${fecha}: ${espaciosActuales}`);
+        
         // Formatear datos para n8n
         const vehicle = marca_vehiculo && modelo_vehiculo ? 
             `${marca_vehiculo} ${modelo_vehiculo}` : 
@@ -319,7 +454,7 @@ app.post('/api/reservas', async (req, res) => {
             }
         }
         
-        // Responder al cliente
+        // Responder al cliente CON ESPACIOS ACTUALIZADOS
         res.json({
             success: true,
             message: 'Reserva creada exitosamente',
@@ -331,6 +466,14 @@ app.post('/api/reservas', async (req, res) => {
                 vehicle,
                 servicios,
                 precio_total
+            },
+            espaciosRestantes: espaciosActuales,
+            // Para sincronización entre dispositivos
+            sync: {
+                fecha: fecha,
+                espaciosDisponibles: espaciosActuales,
+                timestamp: new Date().toISOString(),
+                evento: 'reserva_creada'
             }
         });
         
