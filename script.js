@@ -1128,6 +1128,45 @@ async function sendVerificationCode(phone, code) {
 // Esto evita múltiples mensajes al mismo usuario por la misma reserva
 console.log('📱 IMPORTANTE: Confirmaciones WhatsApp solo desde backend para evitar duplicados');
 
+// 🔧 FUNCIÓN DE DEBUG PARA TESTING DEL BOTÓN
+window.testConfirmButton = function() {
+    console.log('🧪 TESTING BOTÓN CONFIRMAR RESERVA...');
+    
+    const confirmBtn = document.getElementById('confirmReservation');
+    if (!confirmBtn) {
+        console.error('❌ ERROR: Botón confirmReservation no encontrado');
+        return false;
+    }
+    
+    console.log('✅ Botón encontrado:', confirmBtn);
+    console.log('📊 Estado del botón:', {
+        disabled: confirmBtn.disabled,
+        display: window.getComputedStyle(confirmBtn).display,
+        visibility: window.getComputedStyle(confirmBtn).visibility,
+        pointerEvents: window.getComputedStyle(confirmBtn).pointerEvents,
+        classList: Array.from(confirmBtn.classList)
+    });
+    
+    console.log('📊 Estado global:', {
+        selectedDate: selectedDate ? selectedDate.toDateString() : 'null',
+        isVerified,
+        currentPage,
+        reservationData: reservationData
+    });
+    
+    // Test directo de la función
+    try {
+        console.log('🔥 EJECUTANDO handleConfirmReservation directamente...');
+        handleConfirmReservation();
+        return true;
+    } catch (error) {
+        console.error('❌ ERROR al ejecutar handleConfirmReservation:', error);
+        return false;
+    }
+};
+
+console.log('🧪 FUNCIÓN DEBUG DISPONIBLE: testConfirmButton() - Ejecutar en consola para probar botón');
+
 
 
 
