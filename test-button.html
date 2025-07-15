@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Botón Confirmar Reserva</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+            display: inline-block;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: white;
+            border-color: #059669;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(5, 150, 105, 0.3);
+        }
+        
+        /* 🔥 MISMO CSS QUE EN LA APP REAL */
+        #confirmReservation {
+            pointer-events: auto !important;
+            cursor: pointer !important;
+            z-index: 9999 !important;
+            position: relative !important;
+        }
+        
+        .log {
+            background: #1f2937;
+            color: #10b981;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .info { color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <h1>🔥 Test Botón Confirmar Reserva</h1>
+    <p><strong>Esta página simula exactamente el mismo botón que tienes en la aplicación real.</strong></p>
+    
+    <div>
+        <h3>Método 1: onclick HTML (PRINCIPAL)</h3>
+        <button id="confirmReservation" class="btn btn-success" onclick="window.executeReservation()">
+            <i class="fas fa-check"></i>
+            Confirmar Reserva (Test)
+        </button>
+    </div>
+    
+    <div>
+        <h3>Método 2: Event Listener JavaScript</h3>
+        <button id="testBtn2" class="btn btn-success">
+            Event Listener Test
+        </button>
+    </div>
+    
+    <div>
+        <h3>Método 3: Función Directa</h3>
+        <button class="btn btn-success" onclick="directTest()">
+            Función Directa Test
+        </button>
+    </div>
+    
+    <div>
+        <h3>Log de Funcionamiento:</h3>
+        <div id="log" class="log">Esperando clicks...\n</div>
+    </div>
+    
+    <div>
+        <h3>Comandos de Consola:</h3>
+        <p>Abre la consola (F12) y ejecuta:</p>
+        <code>
+            • executeReservation() - Simular reserva<br>
+            • debugButton() - Ver estado del botón<br>
+            • testAllMethods() - Probar todos los métodos
+        </code>
+    </div>
+
+    <script>
+        // Función para logging
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
+            logEl.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        // 🔥 MISMA FUNCIÓN QUE EN LA APP REAL
+        window.executeReservation = function() {
+            log('🔥 FUNCIÓN GLOBAL EJECUTADA desde onclick HTML', 'success');
+            try {
+                // Simular handleConfirmReservation
+                simulateReservation();
+            } catch (error) {
+                log('❌ Error ejecutando reserva: ' + error.message, 'error');
+                alert('Error al procesar la reserva. Por favor, revise los datos e intente nuevamente.');
+            }
+        };
+        
+        // Simular la función de reserva
+        function simulateReservation() {
+            log('🎯 INICIANDO RESERVA UNIVERSAL SINCRONIZADA', 'info');
+            log('✅ BOTÓN CONFIRMRESERVATION FUNCIONANDO - Event listener conectado correctamente', 'success');
+            
+            // Simular datos de reserva
+            const selectedDate = new Date('2025-07-20');
+            const isVerified = true;
+            const reservationData = {
+                name: 'Usuario Test',
+                phone: '+34999888777',
+                carBrand: 'Test',
+                carModel: 'Vehicle',
+                carSize: 'medium',
+                services: ['interior'],
+                price: 25
+            };
+            
+            if (!selectedDate || !isVerified) {
+                log('❌ VALIDACIÓN FALLIDA: selectedDate=' + selectedDate + ', isVerified=' + isVerified, 'error');
+                return;
+            }
+            
+            log('✅ VALIDACIONES PASADAS, continuando con reserva...', 'success');
+            log('📊 DATOS ESTADO: ' + JSON.stringify({
+                selectedDate: selectedDate.toDateString(),
+                isVerified,
+                reservationData: reservationData
+            }), 'info');
+            
+            // Simular éxito
+            setTimeout(() => {
+                log('✅ Reserva confirmada en servidor (SIMULADO)', 'success');
+                log('📱 Confirmación WhatsApp enviada automáticamente (SIMULADO)', 'success');
+                alert('🎉 ¡Reserva confirmada exitosamente! (Test)');
+            }, 1000);
+        }
+        
+        // Función directa de test
+        function directTest() {
+            log('🧪 FUNCIÓN DIRECTA EJECUTADA', 'info');
+            simulateReservation();
+        }
+        
+        // 🔧 FUNCIÓN SIMPLE DE DEBUG (MISMA QUE EN LA APP)
+        window.debugButton = function() {
+            const btn = document.getElementById('confirmReservation');
+            const debug = {
+                exists: !!btn,
+                disabled: btn?.disabled,
+                onclick: btn?.getAttribute('onclick'),
+                visible: btn ? window.getComputedStyle(btn).display !== 'none' : false,
+                pointerEvents: btn ? window.getComputedStyle(btn).pointerEvents : 'N/A',
+                zIndex: btn ? window.getComputedStyle(btn).zIndex : 'N/A'
+            };
+            log('🔍 DEBUG BOTÓN: ' + JSON.stringify(debug, null, 2), 'info');
+            console.log('🔍 DEBUG BOTÓN:', debug);
+            return btn;
+        };
+        
+        // Test de todos los métodos
+        window.testAllMethods = function() {
+            log('🧪 PROBANDO TODOS LOS MÉTODOS...', 'info');
+            
+            // Test 1: onclick
+            log('Test 1: onclick HTML', 'info');
+            try {
+                executeReservation();
+                log('✅ Test 1 EXITOSO', 'success');
+            } catch (e) {
+                log('❌ Test 1 FALLIDO: ' + e.message, 'error');
+            }
+            
+            // Test 2: event listener
+            setTimeout(() => {
+                log('Test 2: Event Listener', 'info');
+                try {
+                    const btn2 = document.getElementById('testBtn2');
+                    btn2.click();
+                    log('✅ Test 2 EXITOSO', 'success');
+                } catch (e) {
+                    log('❌ Test 2 FALLIDO: ' + e.message, 'error');
+                }
+            }, 500);
+            
+            // Test 3: Debug
+            setTimeout(() => {
+                log('Test 3: Debug Button', 'info');
+                debugButton();
+                log('✅ Test 3 COMPLETADO', 'success');
+            }, 1000);
+        };
+        
+        // Configurar event listener para el segundo botón
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🚀 Página cargada - Configurando event listeners...', 'info');
+            
+            const btn2 = document.getElementById('testBtn2');
+            if (btn2) {
+                btn2.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    log('🔥 CLICK DETECTADO EN BOTÓN - Ejecutando reserva...', 'success');
+                    simulateReservation();
+                });
+                log('✅ Event listener configurado para testBtn2', 'success');
+            }
+            
+            log('✅ Inicialización completa', 'success');
+            log('💡 Haz clic en cualquier botón para probar o usa los comandos de consola', 'info');
+        });
+        
+        console.log('🔥 TEST PAGE CARGADA');
+        console.log('🔥 FUNCIONES DISPONIBLES:');
+        console.log('   • executeReservation() - Ejecutar reserva desde onclick');
+        console.log('   • debugButton() - Ver estado del botón');
+        console.log('   • testAllMethods() - Probar todos los métodos');
+    </script>
+</body>
+</html> 
