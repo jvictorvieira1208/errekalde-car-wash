@@ -45,6 +45,9 @@ app.get('/api/health', (req, res) => {
 let db = null;
 const DB_TYPE = process.env.DB_TYPE || 'postgresql';
 
+// CACHE PARA EVITAR MÚLTIPLES ENVÍOS N8N (protección extra)
+const reservasProcesadas = new Map();
+
 if (DB_TYPE === 'postgresql' && process.env.DATABASE_URL) {
     const { Pool } = require('pg');
     const pool = new Pool({
@@ -101,54 +104,34 @@ app.get('/api/espacios', async (req, res) => {
     }
 });
 
-// TEST ENDPOINT PARA N8N - SOLO PARA DEBUGGING
+// TEST ENDPOINT PARA N8N - NUEVO FORMATO EXACTO
 app.post('/api/test-n8n', async (req, res) => {
     try {
-        console.log('🧪 TEST: Enviando datos de prueba a n8n...');
+        console.log('🧪 TEST: Enviando datos de prueba con NUEVO FORMATO a N8N...');
         
-        // Datos de prueba exactos
+        const testReservationId = `TEST-${Date.now()}`;
+        
+        // Datos de prueba con formato EXACTO requerido
         const testData = {
             phone: "+34626327017",
-            message: `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗
-
-✅ Hola Test Usuario, tu reserva está confirmada
-
-📅 *Fecha:* miércoles, 22 de enero de 2025
-🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón
-
-👤 *Cliente:* Test Usuario
-📞 *Teléfono:* +34626327017
-🚗 *Vehículo:* Toyota Corolla (mediano)
-🧽 *Servicio:* Lavado completo
-💰 *Precio Total:* 40€
-🆔 *ID Reserva:* TEST-${Date.now()}
-
-📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*
-🏢 *Ubicación:* Pabellón SWAP ENERGIA
-🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00
-🕐 *No hay horario específico de lavado*
-
-*¡Gracias por usar nuestro servicio!* 🤝
-
-_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`,
+            message: `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗\n\n✅ Hola Joao, tu reserva está confirmada\n\n📅 *Fecha:* miércoles, 16 de julio de 2025\n🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón\n\n👤 *Cliente:* Joao\n📞 *Teléfono:* +34626327017\n🚗 *Vehículo:* audi a8 (grande)\n🧽 *Servicio:* Limpieza interior 25 + Un faro 35\n✨ *Suplementos:* Un faro\n💰 *Precio Total:* 60€\n🆔 *ID Reserva:* ${testReservationId}\n\n📝 *Notas adicionales:* hola\n\n📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*\n🏢 *Ubicación:* Pabellón SWAP ENERGIA\n🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00\n🕐 *No hay horario específico de lavado*\n\n*¡Gracias por usar nuestro servicio!* 🤝\n\n_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`,
             type: 'booking',
-            reservationId: `TEST-${Date.now()}`,
-            reservationData: {
-                name: "Test Usuario",
-                phone: "+34626327017",
-                date: "miércoles, 22 de enero de 2025",
-                vehicle: "Toyota Corolla",
-                services: "Lavado completo",
-                price: 40,
-                vehicleSize: "medium",
-                notes: "Reserva de prueba"
-            }
+            reservationId: testReservationId,
+            // Estructura PLANA como se requiere
+            name: "Joao",
+            date: "miércoles, 16 de julio de 2025",
+            vehicle: "audi a8",
+            services: "Limpieza interior 25 + Un faro 35",
+            supplements: "Un faro",
+            price: "60",
+            vehicleSize: "large",
+            notes: "hola"
         };
         
         const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
         
-        console.log('📡 Enviando a:', N8N_WEBHOOK_URL);
-        console.log('📋 Datos de prueba:', JSON.stringify(testData, null, 2));
+        console.log('📡 Enviando TEST a:', N8N_WEBHOOK_URL);
+        console.log('📋 Datos de prueba (NUEVO FORMATO):', JSON.stringify(testData, null, 2));
         
         const fetch = (await import('node-fetch')).default;
         const response = await fetch(N8N_WEBHOOK_URL, {
@@ -161,7 +144,7 @@ _Servicio exclusivo para empleados SWAP ENERGIA_ ✨`,
         
         const responseText = await response.text();
         
-        console.log('📥 Respuesta de n8n:', {
+        console.log('📥 Respuesta de N8N:', {
             status: response.status,
             statusText: response.statusText,
             body: responseText
@@ -174,11 +157,12 @@ _Servicio exclusivo para empleados SWAP ENERGIA_ ✨`,
             webhookUrl: N8N_WEBHOOK_URL,
             sentData: testData,
             n8nResponse: responseText,
+            message: "TEST enviado con nuevo formato exacto",
             timestamp: new Date().toISOString()
         });
         
     } catch (error) {
-        console.error('❌ Error en test n8n:', error);
+        console.error('❌ Error en test N8N:', error);
         res.status(500).json({
             success: false,
             error: error.message,
@@ -250,19 +234,23 @@ app.post('/api/reservas', async (req, res) => {
         const vehicleSizeText = tamano_vehiculo === 'large' ? 'grande' : 
                                tamano_vehiculo === 'medium' ? 'mediano' : 'pequeño';
         
-        // Procesar servicios y suplementos (detectar si hay suplementos en el string de servicios)
-        let serviciosBase = servicios || '';
+        // Procesar servicios y suplementos (extraer solo el nombre del suplemento)
+        let serviciosCompletos = servicios || '';
         let suplementos = '';
         
-        // Si servicios contiene " + ", separar servicios base de suplementos
+        // Si servicios contiene " + ", separar y extraer solo el nombre del suplemento
         if (servicios && servicios.includes(' + ')) {
             const partes = servicios.split(' + ');
-            serviciosBase = partes[0] || '';
-            suplementos = partes.slice(1).join(' + ') || '';
+            // Para suplementos, extraer solo el nombre (antes del número de precio)
+            if (partes.length > 1) {
+                const suplementoParte = partes[1] || '';
+                // Extraer solo el nombre del suplemento (ej: "Un faro 35" -> "Un faro")
+                suplementos = suplementoParte.replace(/\s+\d+$/, '').trim();
+            }
         }
         
-        // Crear mensaje de confirmación con formato específico
-        const message = `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗\\n\\n✅ Hola ${nombre}, tu reserva está confirmada\\n\\n📅 *Fecha:* ${fecha}\\n🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón\\n\\n👤 *Cliente:* ${nombre}\\n📞 *Teléfono:* ${telefono}\\n🚗 *Vehículo:* ${vehicle} (${vehicleSizeText})\\n🧽 *Servicio:* ${servicios}${suplementos ? `\\n✨ *Suplementos:* ${suplementos}` : ''}\\n💰 *Precio Total:* ${precio_total}€\\n🆔 *ID Reserva:* ${reservationId}${notas ? `\\n\\n📝 *Notas adicionales:* ${notas}` : ''}\\n\\n📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*\\n🏢 *Ubicación:* Pabellón SWAP ENERGIA\\n🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00\\n🕐 *No hay horario específico de lavado*\\n\\n*¡Gracias por usar nuestro servicio!* 🤝\\n\\n_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`;
+        // Crear mensaje de confirmación con formato específico (usar \n, no \\n)
+        const message = `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗\n\n✅ Hola ${nombre}, tu reserva está confirmada\n\n📅 *Fecha:* ${fecha}\n🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón\n\n👤 *Cliente:* ${nombre}\n📞 *Teléfono:* ${telefono}\n🚗 *Vehículo:* ${vehicle} (${vehicleSizeText})\n🧽 *Servicio:* ${servicios}${suplementos ? `\n✨ *Suplementos:* ${suplementos}` : ''}\n💰 *Precio Total:* ${precio_total}€\n🆔 *ID Reserva:* ${reservationId}${notas ? `\n\n📝 *Notas adicionales:* ${notas}` : ''}\n\n📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*\n🏢 *Ubicación:* Pabellón SWAP ENERGIA\n🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00\n🕐 *No hay horario específico de lavado*\n\n*¡Gracias por usar nuestro servicio!* 🤝\n\n_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`;
 
         // Datos para enviar a n8n (UNA SOLA VEZ) - FORMATO EXACTO REQUERIDO
         const n8nData = {
@@ -270,39 +258,65 @@ app.post('/api/reservas', async (req, res) => {
             message: message,
             type: 'booking',
             reservationId: reservationId,
-            reservationData: {
-                name: nombre,
-                phone: telefono,
-                date: fecha,
-                vehicle: vehicle,
-                services: servicios,
-                supplements: suplementos,
-                price: precio_total,
-                vehicleSize: tamano_vehiculo,
-                notes: notas || ''
-            }
+            // Estructura plana como se requiere
+            name: nombre,
+            date: fecha,
+            vehicle: vehicle,
+            services: servicios,
+            supplements: suplementos,
+            price: precio_total,
+            vehicleSize: tamano_vehiculo,
+            notes: notas || ''
         };
         
-        // Enviar a n8n (UNA SOLA VEZ)
-        const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
-        
-        try {
-            const fetch = (await import('node-fetch')).default;
-            const response = await fetch(N8N_WEBHOOK_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(n8nData)
-            });
+        // PROTECCIÓN: Verificar si ya se envió esta reserva
+        if (reservasProcesadas.has(reservationId)) {
+            console.log(`⚠️ Reserva ${reservationId} ya fue enviada a N8N, evitando duplicado`);
+        } else {
+            // Marcar como procesada ANTES de enviar
+            reservasProcesadas.set(reservationId, Date.now());
             
-            if (response.ok) {
-                console.log(`✅ Notificación enviada a n8n para reserva ${reservationId}`);
-            } else {
-                console.error(`❌ Error enviando a n8n: ${response.status}`);
+            // Limpiar cache cada 10 minutos (evitar memory leak)
+            if (reservasProcesadas.size > 100) {
+                const ahora = Date.now();
+                for (const [id, timestamp] of reservasProcesadas.entries()) {
+                    if (ahora - timestamp > 600000) { // 10 minutos
+                        reservasProcesadas.delete(id);
+                    }
+                }
             }
-        } catch (error) {
-            console.error('❌ Error enviando a n8n:', error.message);
+            
+            // Enviar a n8n (UNA SOLA VEZ GARANTIZADA)
+            const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
+            
+            try {
+                console.log(`📡 ENVIANDO A N8N (primera vez): ${reservationId}`);
+                console.log('📋 Estructura de datos:', JSON.stringify(n8nData, null, 2));
+                
+                const fetch = (await import('node-fetch')).default;
+                const response = await fetch(N8N_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(n8nData)
+                });
+                
+                const responseText = await response.text();
+                
+                if (response.ok) {
+                    console.log(`✅ Notificación enviada exitosamente a N8N para reserva ${reservationId}`);
+                    console.log(`📥 Respuesta N8N: ${responseText}`);
+                } else {
+                    console.error(`❌ Error enviando a N8N: ${response.status} - ${responseText}`);
+                    // Si falla, remover del cache para permitir reintento
+                    reservasProcesadas.delete(reservationId);
+                }
+            } catch (error) {
+                console.error('❌ Error enviando a N8N:', error.message);
+                // Si falla, remover del cache para permitir reintento
+                reservasProcesadas.delete(reservationId);
+            }
         }
         
         // Responder al cliente
