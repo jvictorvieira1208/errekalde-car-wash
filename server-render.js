@@ -317,70 +317,62 @@ app.get('/api/health', async (req, res) => {
 // Función para crear tablas PostgreSQL automáticamente
 async function crearTablasPostgreSQL() {
     try {
-        // Verificar si la tabla espacios_disponibles existe
-        const tablaExiste = await db.query(`
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_name = 'espacios_disponibles'
+        console.log('🔧 Verificando/creando tablas PostgreSQL...');
+        
+        // Crear extensiones necesarias primero
+        await db.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";');
+        
+        // Crear tabla espacios_disponibles si no existe
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS espacios_disponibles (
+                id SERIAL PRIMARY KEY,
+                fecha DATE NOT NULL UNIQUE,
+                espacios_disponibles INTEGER NOT NULL DEFAULT 8,
+                espacios_totales INTEGER NOT NULL DEFAULT 8,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
         `);
         
-        if (!tablaExiste[0]?.exists) {
-            console.log('🔧 Creando tablas PostgreSQL...');
-            
-            // Crear extensiones necesarias
-            await db.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";');
-            
-            // Crear tabla espacios_disponibles
-            await db.query(`
-                CREATE TABLE espacios_disponibles (
-                    id SERIAL PRIMARY KEY,
-                    fecha DATE NOT NULL UNIQUE,
-                    espacios_disponibles INTEGER NOT NULL DEFAULT 8,
-                    espacios_totales INTEGER NOT NULL DEFAULT 8,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-            `);
-            
-            // Crear tabla servicios
-            await db.query(`
-                CREATE TABLE servicios (
-                    id SERIAL PRIMARY KEY,
-                    codigo VARCHAR(50) NOT NULL UNIQUE,
-                    nombre VARCHAR(100) NOT NULL,
-                    descripcion TEXT,
-                    precio_small DECIMAL(10,2),
-                    precio_medium DECIMAL(10,2),
-                    precio_large DECIMAL(10,2),
-                    activo BOOLEAN DEFAULT true,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-            `);
-            
-            // Crear tabla reservas
-            await db.query(`
-                CREATE TABLE reservas (
-                    id SERIAL PRIMARY KEY,
-                    fecha DATE NOT NULL,
-                    nombre VARCHAR(100) NOT NULL,
-                    telefono VARCHAR(20) NOT NULL,
-                    marca_vehiculo VARCHAR(50),
-                    modelo_vehiculo VARCHAR(50),
-                    tamano_vehiculo VARCHAR(20) CHECK (tamano_vehiculo IN ('small', 'medium', 'large')),
-                    servicios JSONB,
-                    precio_total DECIMAL(10,2) NOT NULL,
-                    notas TEXT,
-                    codigo_verificacion VARCHAR(10),
-                    verificado BOOLEAN DEFAULT false,
-                    estado VARCHAR(20) DEFAULT 'confirmada' CHECK (estado IN ('pendiente', 'confirmada', 'cancelada')),
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-            `);
-            
-            // Insertar servicios por defecto
+        // Crear tabla servicios si no existe
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS servicios (
+                id SERIAL PRIMARY KEY,
+                codigo VARCHAR(50) NOT NULL UNIQUE,
+                nombre VARCHAR(100) NOT NULL,
+                descripcion TEXT,
+                precio_small DECIMAL(10,2),
+                precio_medium DECIMAL(10,2),
+                precio_large DECIMAL(10,2),
+                activo BOOLEAN DEFAULT true,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        
+        // Crear tabla reservas si no existe
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS reservas (
+                id SERIAL PRIMARY KEY,
+                fecha DATE NOT NULL,
+                nombre VARCHAR(100) NOT NULL,
+                telefono VARCHAR(20) NOT NULL,
+                marca_vehiculo VARCHAR(50),
+                modelo_vehiculo VARCHAR(50),
+                tamano_vehiculo VARCHAR(20) CHECK (tamano_vehiculo IN ('small', 'medium', 'large')),
+                servicios JSONB,
+                precio_total DECIMAL(10,2) NOT NULL,
+                notas TEXT,
+                codigo_verificacion VARCHAR(10),
+                verificado BOOLEAN DEFAULT false,
+                estado VARCHAR(20) DEFAULT 'confirmada' CHECK (estado IN ('pendiente', 'confirmada', 'cancelada')),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        
+        // Verificar si hay servicios, si no, insertarlos
+        const serviciosExistentes = await db.query('SELECT COUNT(*) as count FROM servicios;');
+        if (serviciosExistentes[0].count === 0) {
             await db.query(`
                 INSERT INTO servicios (codigo, nombre, descripcion, precio_small, precio_medium, precio_large) VALUES
                 ('interior', 'Lavado Interior', 'Limpieza completa del interior del vehículo', 20.00, 23.00, 25.00),
@@ -388,17 +380,16 @@ async function crearTablasPostgreSQL() {
                 ('complete', 'Lavado Completo', 'Lavado interior + exterior completo', 35.00, 40.00, 45.00),
                 ('complete-fabric', 'Lavado + Tapicería', 'Lavado completo + limpieza de tapicería', 75.00, 85.00, 95.00),
                 ('headlight-1', 'Pulido 1 Faro', 'Pulido y restauración de un faro', 35.00, 35.00, 35.00),
-                ('headlight-2', 'Pulido 2 Faros', 'Pulido y restauración de ambos faros', 60.00, 60.00, 60.00)
-                ON CONFLICT (codigo) DO NOTHING;
+                ('headlight-2', 'Pulido 2 Faros', 'Pulido y restauración de ambos faros', 60.00, 60.00, 60.00);
             `);
-            
-            console.log('✅ Tablas y datos iniciales creados exitosamente');
-        } else {
-            console.log('✅ Tablas PostgreSQL ya existen');
+            console.log('✅ Servicios iniciales insertados');
         }
+        
+        console.log('✅ Tablas PostgreSQL verificadas/creadas exitosamente');
     } catch (error) {
         console.error('❌ Error creando tablas PostgreSQL:', error.message);
-        throw error;
+        console.error('Error completo:', error);
+        // No lanzar el error para que el servidor siga intentando
     }
 }
 
