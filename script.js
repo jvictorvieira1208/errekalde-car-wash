@@ -921,9 +921,6 @@ async function handleConfirmReservation() {
         } catch (serverError) {
             console.error('❌ Error conectando con servidor:', serverError);
             
-            // ❌ NO GUARDAR LOCALMENTE - MOSTRAR ERROR Y PERMITIR REINTENTO
-            showNotification('❌ Error al procesar reserva. Verifique su conexión e intente nuevamente.', 'error');
-            
             // Revertir espacios ya que la reserva no se procesó
             const fechaStr = selectedDate.toISOString().split('T')[0];
             if (espaciosGlobales[fechaStr] !== undefined) {
@@ -932,7 +929,11 @@ async function handleConfirmReservation() {
                 console.log(`🔄 Espacios revertidos para ${fechaStr}: ${espaciosGlobales[fechaStr]}`);
             }
             
-            throw serverError; // Propagar error para que se maneje en el catch principal
+            // ❌ MOSTRAR ERROR ESPECÍFICO DEL SERVIDOR
+            showNotification('❌ Error al procesar reserva. Verifique su conexión e intente nuevamente.', 'error');
+            
+            // ❌ NO PROPAGAR - PERMITIR QUE EL USUARIO REINTENTE
+            return;
         }
         
     } catch (error) {
