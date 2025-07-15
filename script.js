@@ -2034,27 +2034,33 @@ async function sincronizarEspaciosUniversal() {
             }
         }
         
-        // PASO 2: Fallback a N8N si backend no responde
-        const payload = {
-            action: 'get_spaces',
-            timestamp: Date.now(),
-            cache_buster: 'UNIVERSAL_' + Date.now(),
-            source: IS_PRODUCTION ? 'production' : 'development',
-            device_id: generateDeviceId()
-        };
+        // PASO 2: NO MÁS FALLBACK A N8N PARA EVITAR CONTAMINAR WEBHOOK
+        console.log('⚠️ Backend no disponible, usando datos locales para evitar contaminar N8N');
         
-        const response = await fetch(N8N_SPACES_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache',
-                'X-Sync-Type': 'universal'
-            },
-            body: JSON.stringify(payload)
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
+        // Solo usar datos locales existentes sin enviar nada a N8N
+        if (Object.keys(espaciosGlobales).length > 0) {
+            console.log('📱 Manteniendo espacios locales existentes');
+            updateSyncStatus('conectado');
+            return;
+        } else {
+            console.log('⚠️ No hay datos locales disponibles');
+            updateSyncStatus('desconectado');
+            return;
+                 }
+     } catch (error) {
+         console.error('❌ Error en sincronización universal:', error.message);
+         syncRetryCount++;
+         
+         if (syncRetryCount <= MAX_SYNC_RETRIES) {
+             updateSyncStatus('reintentando');
+             console.log(`🔄 Reintentando sincronización en 10 segundos (intento ${syncRetryCount}/${MAX_SYNC_RETRIES})`);
+             setTimeout(sincronizarEspaciosUniversal, 10000);
+         } else {
+             updateSyncStatus('desconectado');
+             console.log('❌ Máximo número de reintentos alcanzado');
+         }
+     }
+ }
             console.log('📦 Respuesta universal:', data);
             
             // PASO 2: Verificar si hay espacios actualizados en la respuesta

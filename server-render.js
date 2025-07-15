@@ -521,20 +521,23 @@ app.post('/api/reservas', async (req, res) => {
         // Crear mensaje de confirmación con formato específico (usar \n, no \\n)
         const message = `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗\n\n✅ Hola ${nombre}, tu reserva está confirmada\n\n📅 *Fecha:* ${fechaFormateada}\n🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón\n\n👤 *Cliente:* ${nombre}\n📞 *Teléfono:* ${telefono}\n🚗 *Vehículo:* ${vehicle} (${vehicleSizeText})\n🧽 *Servicio:* ${servicios}${suplementos ? `\n✨ *Suplementos:* ${suplementos}` : ''}\n💰 *Precio Total:* ${precio_total}€\n🆔 *ID Reserva:* ${reservationId}${notas ? `\n\n📝 *Notas adicionales:* ${notas}` : ''}\n\n📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*\n🏢 *Ubicación:* Pabellón SWAP ENERGIA\n🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00\n🕐 *No hay horario específico de lavado*\n\n*¡Gracias por usar nuestro servicio!* 🤝\n\n_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`;
 
-        // 📋 FORMATO EXACTO PARA WHATSAPP BUSINESS CLOUD3 (estructura plana)
+        // 🔥 FORMATO EXACTO SEGÚN ESPECIFICACIÓN DEL USUARIO - WHATSAPP BUSINESS CLOUD3
         const n8nData = {
             phone: telefono,
             message: message,
             type: 'booking',
             reservationId: reservationId,
-            name: nombre,
-            date: fechaFormateada,
-            vehicle: vehicle,
-            services: servicios,
-            supplements: suplementos,
-            price: precio_total,
-            vehicleSize: tamano_vehiculo,
-            notes: notas || ''
+            reservationData: {
+                name: nombre,
+                phone: telefono,
+                date: fechaFormateada,
+                vehicle: vehicle,
+                services: servicios,
+                supplements: suplementos || 'Ninguno',
+                price: precio_total,
+                vehicleSize: tamano_vehiculo,
+                notes: notas || ''
+            }
         };
         
         // 🔒 PROTECCIÓN ANTI-DUPLICADOS ULTRA FUERTE
