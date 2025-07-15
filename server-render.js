@@ -250,32 +250,21 @@ app.post('/api/reservas', async (req, res) => {
         const vehicleSizeText = tamano_vehiculo === 'large' ? 'grande' : 
                                tamano_vehiculo === 'medium' ? 'mediano' : 'pequeño';
         
-        // Crear mensaje de confirmación
-        const message = `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗
+        // Procesar servicios y suplementos (detectar si hay suplementos en el string de servicios)
+        let serviciosBase = servicios || '';
+        let suplementos = '';
+        
+        // Si servicios contiene " + ", separar servicios base de suplementos
+        if (servicios && servicios.includes(' + ')) {
+            const partes = servicios.split(' + ');
+            serviciosBase = partes[0] || '';
+            suplementos = partes.slice(1).join(' + ') || '';
+        }
+        
+        // Crear mensaje de confirmación con formato específico
+        const message = `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗\\n\\n✅ Hola ${nombre}, tu reserva está confirmada\\n\\n📅 *Fecha:* ${fecha}\\n🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón\\n\\n👤 *Cliente:* ${nombre}\\n📞 *Teléfono:* ${telefono}\\n🚗 *Vehículo:* ${vehicle} (${vehicleSizeText})\\n🧽 *Servicio:* ${servicios}${suplementos ? `\\n✨ *Suplementos:* ${suplementos}` : ''}\\n💰 *Precio Total:* ${precio_total}€\\n🆔 *ID Reserva:* ${reservationId}${notas ? `\\n\\n📝 *Notas adicionales:* ${notas}` : ''}\\n\\n📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*\\n🏢 *Ubicación:* Pabellón SWAP ENERGIA\\n🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00\\n🕐 *No hay horario específico de lavado*\\n\\n*¡Gracias por usar nuestro servicio!* 🤝\\n\\n_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`;
 
-✅ Hola ${nombre}, tu reserva está confirmada
-
-📅 *Fecha:* ${fecha}
-🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón
-
-👤 *Cliente:* ${nombre}
-📞 *Teléfono:* ${telefono}
-🚗 *Vehículo:* ${vehicle} (${vehicleSizeText})
-🧽 *Servicio:* ${servicios}
-💰 *Precio Total:* ${precio_total}€
-🆔 *ID Reserva:* ${reservationId}
-${notas ? `📝 *Notas adicionales:* ${notas}` : ''}
-
-📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*
-🏢 *Ubicación:* Pabellón SWAP ENERGIA
-🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00
-🕐 *No hay horario específico de lavado*
-
-*¡Gracias por usar nuestro servicio!* 🤝
-
-_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`;
-
-        // Datos para enviar a n8n (UNA SOLA VEZ)
+        // Datos para enviar a n8n (UNA SOLA VEZ) - FORMATO EXACTO REQUERIDO
         const n8nData = {
             phone: telefono,
             message: message,
@@ -287,6 +276,7 @@ _Servicio exclusivo para empleados SWAP ENERGIA_ ✨`;
                 date: fecha,
                 vehicle: vehicle,
                 services: servicios,
+                supplements: suplementos,
                 price: precio_total,
                 vehicleSize: tamano_vehiculo,
                 notes: notas || ''
