@@ -101,6 +101,92 @@ app.get('/api/espacios', async (req, res) => {
     }
 });
 
+// TEST ENDPOINT PARA N8N - SOLO PARA DEBUGGING
+app.post('/api/test-n8n', async (req, res) => {
+    try {
+        console.log('🧪 TEST: Enviando datos de prueba a n8n...');
+        
+        // Datos de prueba exactos
+        const testData = {
+            phone: "+34626327017",
+            message: `🚗 *RESERVA CONFIRMADA - Errekalde Car Wash* 🚗
+
+✅ Hola Test Usuario, tu reserva está confirmada
+
+📅 *Fecha:* miércoles, 22 de enero de 2025
+🕐 *Entrega de llaves:* Entre las 8:00-9:00 en el pabellón
+
+👤 *Cliente:* Test Usuario
+📞 *Teléfono:* +34626327017
+🚗 *Vehículo:* Toyota Corolla (mediano)
+🧽 *Servicio:* Lavado completo
+💰 *Precio Total:* 40€
+🆔 *ID Reserva:* TEST-${Date.now()}
+
+📍 *IMPORTANTE - SOLO TRABAJADORES SWAP ENERGIA*
+🏢 *Ubicación:* Pabellón SWAP ENERGIA
+🔑 *Llaves:* Dejar en el pabellón entre 8:00-9:00
+🕐 *No hay horario específico de lavado*
+
+*¡Gracias por usar nuestro servicio!* 🤝
+
+_Servicio exclusivo para empleados SWAP ENERGIA_ ✨`,
+            type: 'booking',
+            reservationId: `TEST-${Date.now()}`,
+            reservationData: {
+                name: "Test Usuario",
+                phone: "+34626327017",
+                date: "miércoles, 22 de enero de 2025",
+                vehicle: "Toyota Corolla",
+                services: "Lavado completo",
+                price: 40,
+                vehicleSize: "medium",
+                notes: "Reserva de prueba"
+            }
+        };
+        
+        const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8nserver.swapenergia.com/webhook/errekaldecarwash';
+        
+        console.log('📡 Enviando a:', N8N_WEBHOOK_URL);
+        console.log('📋 Datos de prueba:', JSON.stringify(testData, null, 2));
+        
+        const fetch = (await import('node-fetch')).default;
+        const response = await fetch(N8N_WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(testData)
+        });
+        
+        const responseText = await response.text();
+        
+        console.log('📥 Respuesta de n8n:', {
+            status: response.status,
+            statusText: response.statusText,
+            body: responseText
+        });
+        
+        res.json({
+            success: response.ok,
+            status: response.status,
+            statusText: response.statusText,
+            webhookUrl: N8N_WEBHOOK_URL,
+            sentData: testData,
+            n8nResponse: responseText,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ Error en test n8n:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
 // CREAR RESERVA + NOTIFICACIÓN N8N (UNA SOLA VEZ)
 app.post('/api/reservas', async (req, res) => {
     try {
