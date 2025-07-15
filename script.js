@@ -890,22 +890,9 @@ async function handleConfirmReservation() {
                     await sincronizarEspaciosUniversal();
                 }, 1000);
                 
-                // 9. Enviar WhatsApp (no bloquea el flujo)
-                try {
-                    console.log('📱 Enviando confirmación WhatsApp...');
-                    const webhookResult = await sendBookingConfirmation(reservationData);
-                    
-                    if (webhookResult.success) {
-                        console.log('✅ WhatsApp enviado exitosamente');
-                        showNotification('📱 Confirmación WhatsApp enviada', 'success');
-                    } else {
-                        console.warn('⚠️ WhatsApp falló:', webhookResult.error);
-                        showNotification('⚠️ Reserva confirmada. WhatsApp puede haber fallado.', 'warning');
-                    }
-                } catch (webhookError) {
-                    console.error('❌ Error en WhatsApp (no crítico):', webhookError);
-                    showNotification('✅ Reserva confirmada. WhatsApp pendiente.', 'warning');
-                }
+                // 9. El backend ya envió automáticamente el WhatsApp via n8n
+                console.log('📱 Backend envió confirmación WhatsApp automáticamente');
+                showNotification('📱 Confirmación WhatsApp enviada automáticamente', 'success');
                 
             } else {
                 throw new Error(resultadoReserva.error || 'Error del servidor');
@@ -1548,151 +1535,58 @@ async function hacerReservaEnServidor(reservaData) {
     console.log('📋 Datos recibidos:', reservaData);
     
     try {
-        // PASO 1: Intentar backend centralizado PRIMERO
-        if (SERVER_URL) {
-            try {
-                console.log('🌐 Enviando reserva a backend centralizado:', SERVER_URL);
-                const backendResponse = await fetch(`${SERVER_URL}/api/reservar`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Cache-Control': 'no-cache'
-                    },
-                    body: JSON.stringify({
-                        fecha: reservaData.fecha,
-                        name: reservaData.name,
-                        phone: reservaData.phone,
-                        carBrand: reservaData.carBrand,
-                        carModel: reservaData.carModel,
-                        carSize: reservaData.carSize,
-                        services: reservaData.services,
-                        price: reservaData.price,
-                        notas: reservaData.notas || ''
-                    })
-                });
-                
-                if (backendResponse.ok) {
-                    const backendData = await backendResponse.json();
-                    if (backendData.success) {
-                        console.log('✅ Reserva creada exitosamente en backend centralizado');
-                        // Actualizar espacios locales inmediatamente
-                        if (espaciosGlobales[reservaData.fecha]) {
-                            espaciosGlobales[reservaData.fecha] = Math.max(0, espaciosGlobales[reservaData.fecha] - 1);
-                        }
-                        return backendData;
-                    }
-                }
-            } catch (backendError) {
-                console.log('⚠️ Backend centralizado no disponible para reservas, intentando N8N...');
-            }
-        }
+        // Usar el nuevo endpoint /api/reservas que maneja todo automáticamente
+        console.log('🌐 Enviando reserva al backend:', SERVER_URL || 'LOCAL');
         
-        // PASO 2: Fallback a N8N si backend no responde
-        console.log('📤 Enviando reserva a N8N (fallback)...');
-        // PASO 2.1: Preparar payload completo para N8N (webhook que funciona)
-        const payloadCompleto = {
-            // Acción específica para reserva con actualización de espacios
-            action: 'universal_reservation_with_spaces_update',
-            
-            // Datos de la reserva
-            reservation: {
-                id: reservaData.id,
-                name: reservaData.name,
-                phone: reservaData.phone,
-                date: reservaData.fecha,
-                vehicle: reservaData.vehicle,
-                carBrand: reservaData.carBrand,
-                carModel: reservaData.carModel,
-                carSize: reservaData.carSize,
-                services: reservaData.services,
-                serviceNames: reservaData.serviceNames,
-                price: reservaData.price,
-                notes: reservaData.notas,
-                timestamp: reservaData.timestamp,
-                device: reservaData.device,
-                deviceId: reservaData.deviceId
-            },
-            
-            // Actualización de espacios
-            spacesUpdate: {
-                fecha: reservaData.fecha,
-                espaciosAntes: reservaData.espaciosAntes,
-                espaciosDespues: reservaData.espaciosDespues,
-                accion: 'reserva_universal'
-            },
-            
-            // Metadatos del sistema
-            system: {
-                timestamp: Date.now(),
-                source: reservaData.source,
-                version: 'universal_v1.0',
-                sync_required: true
-            }
-        };
+        const endpoint = SERVER_URL ? `${SERVER_URL}/api/reservas` : '/api/reservas';
         
-        console.log('📡 Enviando reserva universal a N8N:', payloadCompleto);
-        
-        // PASO 2: Enviar al webhook principal de N8N (que sabemos que funciona)
-        const response = await fetch(N8N_WEBHOOK_URL, {
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache',
-                'X-Reservation-Type': 'universal'
+                'Cache-Control': 'no-cache'
             },
-            body: JSON.stringify(payloadCompleto)
+            body: JSON.stringify({
+                fecha: reservaData.fecha,
+                nombre: reservaData.name,
+                telefono: reservaData.phone,
+                marca_vehiculo: reservaData.carBrand,
+                modelo_vehiculo: reservaData.carModel,
+                tamano_vehiculo: reservaData.carSize,
+                servicios: reservaData.services,
+                precio_total: reservaData.price,
+                notas: reservaData.notas || ''
+            })
         });
         
-        console.log('📥 Respuesta de N8N:', response.status, response.statusText);
-        
         if (response.ok) {
-            const responseData = await response.json();
-            console.log('✅ Respuesta procesada:', responseData);
-            
-            // PASO 3: Actualizar hash para sincronización
-            lastSpacesHash = JSON.stringify(espaciosGlobales);
-            
-            console.log('✅ Reserva universal procesada exitosamente');
-            
-            return {
-                success: true,
-                reservationId: reservaData.id,
-                espaciosRestantes: reservaData.espaciosDespues,
-                responseData: responseData,
-                timestamp: new Date().toISOString()
-            };
-            
-        } else {
-            // Intentar leer el error del servidor
-            let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-            try {
-                const errorData = await response.text();
-                errorMessage += ` - ${errorData}`;
-            } catch (e) {
-                // Si no se puede leer el error, usar el mensaje por defecto
+            const data = await response.json();
+            if (data.success) {
+                console.log('✅ Reserva creada exitosamente - Backend maneja BD + N8N automáticamente');
+                
+                // Actualizar espacios locales inmediatamente
+                if (espaciosGlobales[reservaData.fecha]) {
+                    espaciosGlobales[reservaData.fecha] = Math.max(0, espaciosGlobales[reservaData.fecha] - 1);
+                }
+                
+                return {
+                    success: true,
+                    message: 'Reserva creada exitosamente',
+                    reservationId: data.reservationId,
+                    data: data.data
+                };
+            } else {
+                throw new Error(data.message || 'Error en la reserva');
             }
-            
-            throw new Error(errorMessage);
+        } else {
+            throw new Error(`Error HTTP ${response.status}`);
         }
         
     } catch (error) {
-        console.error('❌ Error en reserva universal:', error);
+        console.error('❌ Error en reserva:', error.message);
         
-        // Para errores de red o servidor, aún consideramos la reserva como exitosa
-        // ya que los espacios ya se actualizaron localmente
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            console.log('🌐 Error de red - reserva mantenida localmente');
-            return {
-                success: true,
-                reservationId: reservaData.id,
-                espaciosRestantes: reservaData.espaciosDespues,
-                offline: true,
-                message: 'Reserva guardada localmente - se sincronizará cuando haya conexión'
-            };
-        }
-        
-        // Para otros errores, relanzar
-        throw error;
+        // Fallback: mostrar error y permitir reintento
+        throw new Error(`Error al procesar reserva: ${error.message}`);
     }
 }
 
